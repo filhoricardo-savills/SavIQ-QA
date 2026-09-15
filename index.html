@@ -813,68 +813,86 @@ function renderDrawerIfIdle(){
 function gate(html){ $("#gate").classList.add("on"); $("#gateBody").innerHTML = html; $("#bootMsg").classList.add("hide"); }
 function ungate(){ $("#gate").classList.remove("on"); $("#bootMsg").classList.add("hide"); }
 
-let PENDING_EMAIL = null;
+/* Email + password, deliberately, not a sign-in link.
+   Savills mail security pre-fetches every URL it delivers, which spends a
+   single-use sign-in link before the recipient can click it. A password
+   involves no email at sign-in time at all. The one confirmation link sent
+   at sign-up is safe: a scanner "clicking" it simply confirms the address,
+   which is exactly what it is for. */
+let AUTH_MODE = "in";   // "in" | "up"
 
-function signInScreen(msg){
+function authForm(msg){
+  const up = AUTH_MODE === "up";
   gate(
-    '<h2>Sign in</h2>'+
-    '<p>Enter your Savills email address and we&rsquo;ll send you a 6-digit code.</p>'+
+    '<div class="seg" style="width:100%;margin-bottom:16px">'+
+      '<button data-authmode="in" aria-pressed="'+(!up)+'" style="flex:1">Sign in</button>'+
+      '<button data-authmode="up" aria-pressed="'+up+'" style="flex:1">Create account</button>'+
+    '</div>'+
+    '<h2>'+(up?"Create your account":"Sign in")+'</h2>'+
+    '<p>'+(up
+      ? "Use your Savills email address and choose a password. You will confirm the address once, by email."
+      : "Your Savills email and the password you chose.")+'</p>'+
     '<label for="gateEmail">Work email</label>'+
     '<input id="gateEmail" type="email" autocomplete="email" inputmode="email" placeholder="name@savills.ie">'+
-    '<button class="btn btn-primary" id="gateSend">Email me a code</button>'+
+    '<label for="gatePass" style="margin-top:12px">Password</label>'+
+    '<input id="gatePass" type="password" autocomplete="'+(up?"new-password":"current-password")+'" placeholder="'+(up?"at least 8 characters":"")+'">'+
+    '<button class="btn btn-primary" id="gateGo">'+(up?"Create account":"Sign in")+'</button>'+
     (msg||"")+
-    '<p class="gate-note">Only Savills addresses can open this workspace. '+
-    'If you sign in with anything else you will get in, but every page will be empty &mdash; '+
-    'access is enforced by the database, not the screen.</p>');
+    '<p class="gate-note">'+(up
+      ? "Only Savills addresses can open this workspace. Anyone else can create an account, but every page will be empty &mdash; access is enforced by the database, not the screen."
+      : "First time here? Use <strong>Create account</strong> above.")+'</p>');
   setTimeout(()=>{ const el=$("#gateEmail"); if(el) el.focus(); }, 40);
 }
+function signInScreen(msg){ AUTH_MODE = "in"; authForm(msg); }
 
-/* A 6-digit code rather than a clickable link, deliberately: corporate mail
-   scanners (Defender Safe Links and friends) pre-fetch every URL in a message,
-   which spends a single-use sign-in link before the recipient ever clicks it.
-   There is nothing in a code for a scanner to consume. */
-async function sendCode(){
+function authError(text){ return '<div class="gate-msg err">'+esc(text)+'</div>'; }
+
+async function submitAuth(){
   const email = ($("#gateEmail").value||"").trim().toLowerCase();
-  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
-    signInScreen('<div class="gate-msg err">That does not look like an email address.</div>');
-    return;
-  }
-  const btn = $("#gateSend"); btn.disabled = true; btn.textContent = "Sending…";
-  const {error} = await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:true } });
-  if(error){
-    signInScreen('<div class="gate-msg err">'+esc(error.message)+'</div>');
-    const el=$("#gateEmail"); if(el) el.value = email;
-    return;
-  }
-  PENDING_EMAIL = email;
-  codeScreen();
-}
+  const pass  = $("#gatePass").value||"";
+  const keep  = {email};
 
-function codeScreen(msg){
-  gate('<h2>Check your inbox</h2>'+
-    '<p>We sent a 6-digit code to <strong>'+esc(PENDING_EMAIL)+'</strong>. Enter it below.</p>'+
-    '<label for="gateCode">Sign-in code</label>'+
-    '<input id="gateCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" '+
-      'placeholder="000000" style="font-family:var(--mono);font-size:22px;letter-spacing:8px;text-align:center">'+
-    '<button class="btn btn-primary" id="gateVerify">Sign in</button>'+
-    (msg||"")+
-    '<p class="gate-note">The code lasts about an hour. Nothing arrived? Look in Junk &mdash; '+
-    'mail from a new sender often lands there the first time. '+
-    '<button class="btn btn-sm" id="gateBack" style="width:auto;margin-top:10px">Use a different address</button></p>');
-  setTimeout(()=>{ const el=$("#gateCode"); if(el) el.focus(); }, 40);
-}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return refill(authError("That does not look like an email address."), keep);
+  if(AUTH_MODE==="up" && pass.length < 8) return refill(authError("Choose a password of at least 8 characters."), keep);
+  if(!pass) return refill(authError("Enter your password."), keep);
 
-async function verifyCode(){
-  const token = ($("#gateCode").value||"").replace(/\D/g,"");
-  if(token.length<6){ codeScreen('<div class="gate-msg err">Enter all six digits.</div>'); return; }
-  const btn = $("#gateVerify"); btn.disabled = true; btn.textContent = "Checking…";
-  const {data, error} = await sb.auth.verifyOtp({ email:PENDING_EMAIL, token, type:"email" });
-  if(error || !data || !data.user){
-    codeScreen('<div class="gate-msg err">'+esc(error?error.message:"That code was not accepted.")+
-      ' Codes can only be used once &mdash; request a new one if you have already tried it.</div>');
+  const btn = $("#gateGo"); btn.disabled = true; btn.textContent = AUTH_MODE==="up" ? "Creating\u2026" : "Signing in\u2026";
+
+  if(AUTH_MODE==="up"){
+    const {data, error} = await sb.auth.signUp({email, password:pass});
+    if(error) return refill(authError(friendlyAuth(error.message)), keep);
+    if(data.session && data.user) return start(data.user);      // confirmation switched off
+    gate('<h2>Confirm your email</h2>'+
+      '<p>We sent a confirmation message to <strong>'+esc(email)+'</strong>. Open it and click the link, '+
+      'then come back and sign in with the password you just chose.</p>'+
+      '<button class="btn btn-primary" id="gateBack">Back to sign in</button>'+
+      '<p class="gate-note">You only ever do this once. After that, signing in needs no email at all.</p>');
     return;
   }
+
+  const {data, error} = await sb.auth.signInWithPassword({email, password:pass});
+  if(error) return refill(authError(friendlyAuth(error.message)), keep);
   await start(data.user);
+}
+
+function refill(msg, keep){
+  authForm(msg);
+  const e = $("#gateEmail"); if(e && keep && keep.email) e.value = keep.email;
+  const p = $("#gatePass"); if(p) p.focus();
+}
+
+function friendlyAuth(m){
+  if(/Invalid login credentials/i.test(m))
+    return "That email and password do not match an account. If you have not created one yet, use Create account.";
+  if(/Email not confirmed/i.test(m))
+    return "Your address has not been confirmed yet. Open the confirmation email we sent and click the link, then try again.";
+  if(/User already registered/i.test(m))
+    return "There is already an account for that address. Use Sign in \u2014 or ask for it to be reset if you have forgotten the password.";
+  if(/Password should be/i.test(m))
+    return "That password is too short. Use at least 8 characters.";
+  if(/rate limit|too many/i.test(m))
+    return "Too many attempts just now. Wait a minute and try again.";
+  return m;
 }
 
 async function signOut(){
@@ -2756,14 +2774,14 @@ try{ const th=localStorage.getItem("meterqa.theme"); if(th) document.documentEle
 
 /* sign-in screen buttons live outside the delegated app handler */
 document.addEventListener("click", e=>{
-  if(e.target.closest("#gateSend"))   return sendCode();
-  if(e.target.closest("#gateVerify")) return verifyCode();
+  const am = e.target.closest("[data-authmode]");
+  if(am){ AUTH_MODE = am.dataset.authmode; authForm(); return; }
+  if(e.target.closest("#gateGo")) return submitAuth();
   if(e.target.closest("#gateBack")) return signInScreen();
   if(e.target.closest("#gateOut"))  return signOut();
 });
 document.addEventListener("keydown", e=>{
-  if(e.key==="Enter" && e.target.id==="gateEmail"){ e.preventDefault(); sendCode(); }
-  if(e.key==="Enter" && e.target.id==="gateCode"){ e.preventDefault(); verifyCode(); }
+  if(e.key==="Enter" && (e.target.id==="gateEmail"||e.target.id==="gatePass")){ e.preventDefault(); submitAuth(); }
 });
 
 Store.onChange(safeRender);
