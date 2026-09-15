@@ -1,0 +1,2751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Meter QA Review</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d6e63'/><path d='M22 68l18-22 15 11 20-30' stroke='white' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+
+:root{
+  --ground:#eceff0; --surface:#ffffff; --surface-2:#f5f7f7; --surface-3:#e6ebeb;
+  --ink:#121c1e; --ink-2:#3d4c4e; --muted:#6b7b7d;
+  --line:#d6dddd; --line-strong:#b6c2c2;
+  --accent:#0d6e63; --accent-ink:#ffffff; --accent-soft:#d9ebe8; --accent-hover:#0a564e;
+  --ok:#2c7a51; --ok-soft:#dbeee3; --ok-line:#a9d3bd;
+  --warn:#8f6209; --warn-soft:#f6ebd3; --warn-line:#e0c58a;
+  --crit:#a52c39; --crit-soft:#f7dee0; --crit-line:#e4aeb4;
+  --info:#1f5c8b; --info-soft:#dce8f2; --info-line:#a9c6dd;
+  --slate:#5b6f72; --slate-soft:#e3e9e9; --slate-line:#c2cfcf;
+  --shadow-1:0 1px 2px rgba(18,28,30,.07);
+  --shadow-2:0 2px 4px rgba(18,28,30,.06),0 12px 28px -14px rgba(18,28,30,.28);
+  --shadow-3:0 4px 8px rgba(18,28,30,.08),0 28px 60px -20px rgba(18,28,30,.4);
+  --r:7px; --r-lg:11px;
+  --rail:236px;
+  --sans:"IBM Plex Sans",ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --ground:#0c1413; --surface:#141d1d; --surface-2:#1a2424; --surface-3:#243030;
+  --ink:#e3ebe9; --ink-2:#b2c1be; --muted:#829391;
+  --line:#283534; --line-strong:#3a4948;
+  --accent:#3fb3a2; --accent-ink:#052220; --accent-soft:#16403a; --accent-hover:#57c8b7;
+  --ok:#57b287; --ok-soft:#153426; --ok-line:#2a5c44;
+  --warn:#d3a244; --warn-soft:#352913; --warn-line:#5e4a1e;
+  --crit:#e2757f; --crit-soft:#3a1a1e; --crit-line:#632f36;
+  --info:#69a9d9; --info-soft:#122839; --info-line:#26455f;
+  --slate:#8fa2a3; --slate-soft:#1f2b2b; --slate-line:#354443;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 2px 4px rgba(0,0,0,.3),0 12px 28px -14px rgba(0,0,0,.8);
+  --shadow-3:0 4px 8px rgba(0,0,0,.4),0 28px 60px -20px rgba(0,0,0,.9);
+}}
+:root[data-theme="dark"]{
+  --ground:#0c1413; --surface:#141d1d; --surface-2:#1a2424; --surface-3:#243030;
+  --ink:#e3ebe9; --ink-2:#b2c1be; --muted:#829391;
+  --line:#283534; --line-strong:#3a4948;
+  --accent:#3fb3a2; --accent-ink:#052220; --accent-soft:#16403a; --accent-hover:#57c8b7;
+  --ok:#57b287; --ok-soft:#153426; --ok-line:#2a5c44;
+  --warn:#d3a244; --warn-soft:#352913; --warn-line:#5e4a1e;
+  --crit:#e2757f; --crit-soft:#3a1a1e; --crit-line:#632f36;
+  --info:#69a9d9; --info-soft:#122839; --info-line:#26455f;
+  --slate:#8fa2a3; --slate-soft:#1f2b2b; --slate-line:#354443;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 2px 4px rgba(0,0,0,.3),0 12px 28px -14px rgba(0,0,0,.8);
+  --shadow-3:0 4px 8px rgba(0,0,0,.4),0 28px 60px -20px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.hide{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- shell ---------- */
+#app{display:grid;grid-template-columns:var(--rail) 1fr;min-height:100vh}
+#rail{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden}
+.brand{display:flex;align-items:center;gap:9px;padding:14px 14px 12px;border-bottom:1px solid var(--line)}
+.brand-mark{width:26px;height:26px;border-radius:6px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.brand-mark svg{width:15px;height:15px}
+.brand-name{font-weight:600;font-size:13.5px;letter-spacing:-.01em;line-height:1.15}
+.brand-sub{font-size:10.5px;color:var(--muted);letter-spacing:.03em}
+.rail-scroll{flex:1;overflow-y:auto;padding:10px 8px 16px}
+.rail-group+.rail-group{margin-top:16px}
+.rail-head{display:flex;align-items:center;justify-content:space-between;padding:0 6px 6px;gap:6px}
+.nav-item{display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border:0;background:none;border-radius:var(--r);color:var(--ink-2);text-align:left;font-size:13.5px;font-weight:500}
+.nav-item:hover{background:var(--surface-2);color:var(--ink)}
+.nav-item[aria-current="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav-item svg{width:16px;height:16px;flex:none;opacity:.85}
+.nav-count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-3);padding:1px 5px;border-radius:20px}
+.nav-item[aria-current="true"] .nav-count{background:var(--surface);color:var(--accent)}
+.acct-item{display:flex;align-items:center;gap:8px;width:100%;padding:5px 8px;border:0;background:none;border-radius:var(--r);text-align:left;color:var(--ink-2);font-size:13px}
+.acct-item:hover{background:var(--surface-2);color:var(--ink)}
+.acct-item[aria-current="true"]{background:var(--surface-3);color:var(--ink);font-weight:600}
+.acct-code{font-family:var(--mono);font-size:10.5px;color:var(--muted);flex:none;width:34px}
+.acct-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-dot{margin-left:auto;width:6px;height:6px;border-radius:50%;flex:none}
+.rail-foot{border-top:1px solid var(--line);padding:9px 10px;display:flex;align-items:center;gap:8px}
+.rail-foot .who{min-width:0;flex:1}
+.rail-foot .who-name{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail-foot .who-role{font-size:10.5px;color:var(--muted)}
+
+/* ---------- main ---------- */
+#main{min-width:0;display:flex;flex-direction:column}
+#topbar{position:sticky;top:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 18px;flex-wrap:wrap}
+.view-title{font-size:17px;font-weight:600;letter-spacing:-.015em;margin:0;line-height:1.2}
+.view-sub{font-size:11.5px;color:var(--muted);margin-top:1px}
+.topbar-spacer{flex:1;min-width:8px}
+.search{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:0 8px;min-width:150px}
+.search svg{width:14px;height:14px;color:var(--muted);flex:none}
+.search input{border:0;background:none;outline:none;padding:6px 0;width:100%;font-size:13px}
+.kbd{font-family:var(--mono);font-size:10px;color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surface)}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);padding:5px 10px;border-radius:var(--r);font-size:13px;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn svg{width:14px;height:14px}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn-ghost{border-color:transparent;background:none;color:var(--ink-2)}
+.btn-ghost:hover{background:var(--surface-2);color:var(--ink)}
+.btn-danger{color:var(--crit);border-color:var(--crit-line)}
+.btn-danger:hover{background:var(--crit-soft)}
+.btn-sm{padding:3px 7px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.icon-btn{display:grid;place-items:center;width:28px;height:28px;border-radius:var(--r);border:1px solid transparent;background:none;color:var(--muted)}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+.icon-btn svg{width:16px;height:16px}
+
+#viewport{flex:1;padding:16px 18px 64px;min-width:0}
+.pane{display:none}
+.pane.on{display:block}
+
+/* ---------- toolbar / filters ---------- */
+.toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:2px;gap:2px}
+.seg button{border:0;background:none;padding:3px 9px;border-radius:5px;font-size:12.5px;font-weight:500;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-1);font-weight:600}
+.field{display:inline-flex;align-items:center;gap:5px}
+.field > label{font-size:11px;color:var(--muted);font-weight:500}
+select.mini,input.mini{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:4px 7px;font-size:12.5px;max-width:190px}
+.chip-filter{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:3px 9px;font-size:12px;color:var(--ink-2)}
+.chip-filter[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+/* ---------- pills ---------- */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;border:1px solid;white-space:nowrap;line-height:1.5}
+.pill .dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+.s-open{color:var(--warn);background:var(--warn-soft);border-color:var(--warn-line)}
+.s-prog{color:var(--info);background:var(--info-soft);border-color:var(--info-line)}
+.s-closed{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-line)}
+.p-urgent{color:var(--crit);background:var(--crit-soft);border-color:var(--crit-line)}
+.p-high{color:#a8500f;background:#f8e6d6;border-color:#e9bf99}
+.p-medium{color:var(--warn);background:var(--warn-soft);border-color:var(--warn-line)}
+.p-low{color:var(--slate);background:var(--slate-soft);border-color:var(--slate-line)}
+:root:not([data-theme="light"]) .p-high{color:#e39a63;background:#3a2314;border-color:#66401f}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .p-high{color:#a8500f;background:#f8e6d6;border-color:#e9bf99}}
+:root[data-theme="dark"] .p-high{color:#e39a63;background:#3a2314;border-color:#66401f}
+.cat{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);white-space:nowrap}
+.cat .bar{width:3px;height:12px;border-radius:2px;flex:none}
+.tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:4px;background:var(--surface-3);color:var(--ink-2);border:1px solid var(--line)}
+.avatar{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;flex:none;letter-spacing:.02em}
+.avatar.lg{width:30px;height:30px;font-size:12px}
+.avatar.xs{width:18px;height:18px;font-size:9px}
+.avatar.none{background:var(--surface-3)!important;color:var(--muted);border:1px dashed var(--line-strong)}
+.overdue{color:var(--crit);font-weight:600}
+.duesoon{color:var(--warn);font-weight:600}
+.carry{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:10.5px;padding:1px 5px;border-radius:4px;background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit-line)}
+
+/* ---------- cards / tiles ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)}
+.card-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.card-head h3{margin:0;font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.card-body{padding:14px}
+.grid-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 13px;display:flex;flex-direction:column;gap:2px}
+.tile .v{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1.05}
+.tile .l{font-size:11.5px;color:var(--muted);font-weight:500}
+.tile .d{font-size:11px;margin-top:3px;color:var(--muted)}
+.tile.accent{border-left:3px solid var(--accent)}
+.tile.crit .v{color:var(--crit)} .tile.warn .v{color:var(--warn)} .tile.ok .v{color:var(--ok)}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px;align-items:start}
+/* ---------- list view ---------- */
+.lgroup{margin-bottom:4px}
+.lgroup-head{display:flex;align-items:center;gap:8px;padding:8px 6px 6px;position:sticky;top:53px;background:var(--ground);z-index:5}
+.lgroup-head .tw{display:flex;align-items:center;gap:7px;border:0;background:none;padding:0;color:var(--ink)}
+.lgroup-head .caret{width:14px;height:14px;color:var(--muted);transition:transform .15s}
+.lgroup.collapsed .caret{transform:rotate(-90deg)}
+.lgroup-title{font-size:13px;font-weight:600;letter-spacing:-.01em}
+.lgroup-n{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.lgroup.collapsed .ltable,.lgroup.collapsed .ladd{display:none}
+.ltable{width:100%;border-collapse:separate;border-spacing:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.ltable th{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 10px;background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap}
+.ltable td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.ltable tr:last-child td{border-bottom:0}
+.ltable tbody tr:hover{background:var(--surface-2)}
+.ltable tbody tr.sel{background:var(--accent-soft)}
+.ltable .c-ref{width:72px} .ltable .c-st{width:116px} .ltable .c-pr{width:96px}
+.ltable .c-own{width:44px} .ltable .c-due{width:92px} .ltable .c-age{width:60px} .ltable .c-cat{width:150px}
+.ltitle{display:flex;align-items:center;gap:7px;min-width:0}
+.ltitle .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ltitle .sub{font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.done .t{text-decoration:line-through;color:var(--muted)}
+.tick{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--line-strong);background:none;display:grid;place-items:center;flex:none;padding:0;color:transparent}
+.tick:hover{border-color:var(--ok);color:var(--ok)}
+.tick[data-done="1"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.tick svg{width:10px;height:10px}
+.ladd{width:100%;text-align:left;border:1px dashed var(--line-strong);background:none;color:var(--muted);padding:6px 12px;border-radius:var(--r);font-size:12.5px;margin-top:5px}
+.ladd:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.lscroll{overflow-x:auto}
+
+/* ---------- board ---------- */
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:290px;gap:11px;overflow-x:auto;padding-bottom:12px;align-items:start}
+.col{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-lg);display:flex;flex-direction:column;max-height:calc(100vh - 170px)}
+.col-head{display:flex;align-items:center;gap:7px;padding:9px 11px;border-bottom:1px solid var(--line)}
+.col-head .t{font-size:12.5px;font-weight:600}
+.col-head .n{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+.col-head .stripe{width:3px;height:14px;border-radius:2px}
+.col-body{padding:8px;display:flex;flex-direction:column;gap:7px;overflow-y:auto;min-height:56px}
+.col.over{outline:2px dashed var(--accent);outline-offset:-2px}
+.kcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 10px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow-1);cursor:grab;text-align:left;width:100%}
+.kcard:hover{border-color:var(--line-strong)}
+.kcard.dragging{opacity:.4}
+.kcard .kt{font-size:13px;font-weight:500;line-height:1.35}
+.kcard .krow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kcard .kmeta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+
+/* ---------- my tasks ---------- */
+.bucket{margin-bottom:16px}
+.bucket-head{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+.bucket-head h3{margin:0;font-size:13.5px;font-weight:600}
+.bucket-head .n{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.mrow{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:5px}
+.mrow:hover{border-color:var(--line-strong)}
+.mrow .t{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;border:0;background:none;padding:0}
+
+/* ---------- calendar ---------- */
+.cal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface-2);border-bottom:1px solid var(--line)}
+.cal-dow div{padding:6px 8px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-cell{min-height:98px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 6px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.cal-cell:nth-child(7n){border-right:0}
+.cal-cell.out{background:var(--surface-2)}
+.cal-cell.today{background:var(--accent-soft)}
+.cal-d{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:500}
+.cal-cell.today .cal-d{color:var(--accent);font-weight:700}
+.cal-ev{display:flex;align-items:center;gap:4px;font-size:11px;padding:2px 5px;border-radius:4px;background:var(--surface-3);border-left:2px solid var(--slate);text-align:left;border-top:0;border-right:0;border-bottom:0;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-ev:hover{background:var(--line)}
+.cal-more{font-size:10.5px;color:var(--muted);text-align:left;border:0;background:none;padding:0 5px}
+
+/* ---------- timeline ---------- */
+.tl{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.tl-scroll{overflow-x:auto}
+.tl-inner{min-width:760px}
+.tl-head{display:flex;border-bottom:1px solid var(--line);background:var(--surface-2);position:sticky;top:0;z-index:2}
+.tl-label{width:250px;flex:none;padding:7px 11px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border-right:1px solid var(--line)}
+.tl-months{flex:1;display:flex;position:relative}
+.tl-month{flex:1;padding:7px 8px;font-size:11px;font-weight:600;color:var(--muted);border-right:1px solid var(--line);white-space:nowrap;overflow:hidden}
+.tl-row{display:flex;border-bottom:1px solid var(--line);align-items:center;min-height:34px}
+.tl-row:hover{background:var(--surface-2)}
+.tl-rlabel{width:250px;flex:none;padding:5px 11px;border-right:1px solid var(--line);display:flex;align-items:center;gap:6px;min-width:0}
+.tl-rlabel .t{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:none;padding:0;text-align:left;color:inherit}
+.tl-track{flex:1;position:relative;height:34px}
+.tl-bar{position:absolute;top:9px;height:16px;border-radius:4px;display:flex;align-items:center;padding:0 6px;font-size:10.5px;font-weight:600;color:#fff;overflow:hidden;white-space:nowrap;border:0;min-width:16px}
+.tl-today{position:absolute;top:0;bottom:0;width:1.5px;background:var(--crit);opacity:.65;z-index:1}
+.tl-gl{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+
+/* ---------- weekly review ---------- */
+.sess-list{display:flex;flex-direction:column;gap:8px}
+.sess{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:11px 13px}
+.sess.live{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.sess .dt{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;flex:none;width:52px;border-right:1px solid var(--line);padding-right:11px}
+.sess .dt b{display:block;font-size:19px;color:var(--ink);font-weight:600;line-height:1.1}
+.sess .body{flex:1;min-width:0}
+.sess .body .t{font-weight:600;font-size:13.5px}
+.sess .body .m{font-size:11.5px;color:var(--muted);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
+.agenda-acct{margin-bottom:14px}
+.agenda-acct h4{margin:0 0 6px;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px}
+.wrow{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:5px;flex-wrap:wrap}
+.wrow.done-c{border-left:3px solid var(--ok)}
+.wrow.done-o{border-left:3px solid var(--warn)}
+.wrow.done-d{border-left:3px solid var(--slate)}
+.wrow .wt{flex:1;min-width:170px;border:0;background:none;text-align:left;padding:0;font-weight:500;color:inherit}
+.wactions{display:flex;gap:4px;flex:none}
+.wbtn{border:1px solid var(--line-strong);background:var(--surface);padding:3px 9px;border-radius:var(--r);font-size:12px;font-weight:500}
+.wbtn[aria-pressed="true"][data-o="closed"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.wbtn[aria-pressed="true"][data-o="open"]{background:var(--warn);border-color:var(--warn);color:#fff}
+.wbtn[aria-pressed="true"][data-o="deferred"]{background:var(--slate);border-color:var(--slate);color:#fff}
+.summary-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px}
+pre.email{font-family:var(--mono);font-size:11.5px;line-height:1.6;white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:12px;max-height:340px;overflow:auto;margin:0}
+
+/* ---------- drawer ---------- */
+#scrim{position:fixed;inset:0;background:rgba(10,20,20,.42);z-index:60;opacity:0;pointer-events:none;transition:opacity .16s}
+#scrim.on{opacity:1;pointer-events:auto}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(470px,100vw);background:var(--surface);border-left:1px solid var(--line);z-index:70;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .2s cubic-bezier(.4,0,.2,1);box-shadow:var(--shadow-3)}
+#drawer.on{transform:none}
+.dw-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.dw-body{flex:1;overflow-y:auto;padding:14px}
+.dw-title{width:100%;border:1px solid transparent;background:none;font-size:17px;font-weight:600;letter-spacing:-.015em;padding:5px 7px;border-radius:var(--r);resize:none;line-height:1.3;font-family:inherit}
+.dw-title:hover{border-color:var(--line)}
+.dw-title:focus{border-color:var(--accent);background:var(--surface-2);outline:none}
+.props{display:grid;grid-template-columns:104px 1fr;gap:7px 10px;align-items:center;margin:10px 0 16px}
+.props > label{font-size:11.5px;color:var(--muted);font-weight:500}
+.stack{display:flex;flex-direction:column;gap:5px;min-width:0}
+.props select,.props input,.props textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:5px 7px;font-size:13px;font-family:inherit}
+.props select:hover,.props input:hover{border-color:var(--line-strong)}
+.dw-sec{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.dw-sec h4{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.notes{width:100%;min-height:74px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:8px;font-family:inherit;font-size:13px;resize:vertical;line-height:1.55}
+.sub{display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line)}
+.sub .st{flex:1;border:0;background:none;padding:2px 0;font-size:13px}
+.sub.done .st{text-decoration:line-through;color:var(--muted)}
+.cmt{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid var(--line)}
+.cmt .cb{flex:1;min-width:0}
+.cmt .ch{display:flex;align-items:baseline;gap:7px}
+.cmt .cn{font-size:12.5px;font-weight:600}
+.cmt .cd{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+.cmt .ct{font-size:13px;margin-top:2px;white-space:pre-wrap;line-height:1.5;word-break:break-word}
+.act{display:flex;gap:8px;font-size:11.5px;color:var(--muted);padding:4px 0;align-items:baseline}
+.act .ad{font-family:var(--mono);font-size:10.5px;flex:none}
+
+/* ---------- modal ---------- */
+#modal{position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:8vh 16px 16px;background:rgba(10,20,20,.45);overflow-y:auto}
+#modal.on{display:flex}
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);width:100%;max-width:520px;box-shadow:var(--shadow-3);overflow:hidden}
+.sheet.wide{max-width:760px}
+.sheet-head{display:flex;align-items:center;gap:8px;padding:12px 15px;border-bottom:1px solid var(--line)}
+.sheet-head h3{margin:0;font-size:14.5px;font-weight:600}
+.sheet-body{padding:15px;max-height:66vh;overflow-y:auto}
+.sheet-foot{display:flex;gap:8px;justify-content:flex-end;padding:11px 15px;border-top:1px solid var(--line);background:var(--surface-2);flex-wrap:wrap}
+.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.form-grid .full{grid-column:1/-1}
+.fl{display:flex;flex-direction:column;gap:3px}
+.fl label{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.03em}
+.fl input,.fl select,.fl textarea{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;font-size:13.5px;font-family:inherit;width:100%}
+.fl input:focus,.fl select:focus,.fl textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.hint{font-size:11px;color:var(--muted)}
+
+/* ---------- misc ---------- */
+.empty{text-align:center;padding:44px 20px;color:var(--muted);background:var(--surface);border:1px dashed var(--line-strong);border-radius:var(--r-lg)}
+.empty h3{margin:0 0 5px;font-size:14.5px;color:var(--ink);font-weight:600}
+.empty p{margin:0 auto 12px;max-width:44ch;font-size:13px}
+.banner{display:flex;align-items:center;gap:9px;padding:8px 13px;border-radius:var(--r);border:1px solid var(--warn-line);background:var(--warn-soft);color:var(--warn);font-size:12.5px;margin-bottom:12px;flex-wrap:wrap}
+.banner.info{border-color:var(--info-line);background:var(--info-soft);color:var(--info)}
+.banner .sp{flex:1}
+#toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,16px);background:var(--ink);color:var(--ground);padding:8px 15px;border-radius:20px;font-size:13px;font-weight:500;z-index:200;opacity:0;pointer-events:none;transition:all .2s;box-shadow:var(--shadow-2)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.bar-row{display:grid;grid-template-columns:118px 1fr 38px;gap:9px;align-items:center;padding:3px 0;font-size:12px}
+.bar-row .lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.bar-track{height:16px;background:var(--surface-3);border-radius:3px;overflow:hidden;display:flex}
+.bar-fill{height:100%}
+.bar-row .val{font-family:var(--mono);font-size:11.5px;text-align:right;color:var(--muted)}
+.legend{display:flex;gap:11px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend i{width:9px;height:9px;border-radius:2px;display:block}
+/* ---------- device health check ---------- */
+.dh{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.dh-scroll{overflow-x:auto}
+.dh-inner{min-width:780px}
+.dh-head{display:flex;border-bottom:1px solid var(--line);background:var(--surface-2);position:sticky;top:0;z-index:3}
+.dh-head .dh-l,.dh-head .dh-r{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:block;padding-top:8px;padding-bottom:8px}
+.dh-l{width:210px;flex:none;padding:6px 11px;border-right:1px solid var(--line);min-width:0;display:flex;flex-direction:column;justify-content:center}
+.dh-r{width:168px;flex:none;padding:6px 11px;border-left:1px solid var(--line);display:flex;align-items:center;gap:8px;justify-content:space-between}
+.dh-track{flex:1;position:relative;min-width:0;height:44px}
+.dh-month{position:absolute;top:8px;font-size:11px;font-weight:600;color:var(--muted);padding-left:6px;border-left:1px solid var(--line);white-space:nowrap;overflow:hidden}
+.dh-group{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--surface-2);border-bottom:1px solid var(--line);border-top:1px solid var(--line);font-size:12.5px;font-weight:600}
+.dh-lane{display:flex;border-bottom:1px solid var(--line);min-height:44px}
+.dh-lane:last-child{border-bottom:0}
+.dh-lane:hover{background:var(--surface-2)}
+.dh-key{font-family:var(--mono);font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dh-site{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.dh-gl{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.7}
+.dh-now{position:absolute;top:0;bottom:0;width:1.5px;background:var(--crit);opacity:.5;z-index:1}
+.dh-bar{position:absolute;top:14px;height:16px;border-radius:8px;border:0;min-width:16px;padding:0;z-index:2;
+  display:flex;align-items:center;justify-content:flex-end;overflow:hidden}
+.dh-bar:hover{outline:2px solid var(--ink);outline-offset:1px}
+.dh-tick{display:grid;place-items:center;width:14px;height:14px;margin-right:1px;color:#fff;flex:none}
+.dh-tick svg{width:9px;height:9px;stroke-width:3}
+.dh-nums{display:flex;gap:8px;align-items:baseline;font-size:12px}
+.h-good{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-line)}
+.h-watch{color:var(--warn);background:var(--warn-soft);border-color:var(--warn-line)}
+.h-risk{color:var(--info);background:var(--info-soft);border-color:var(--info-line)}
+.h-crit{color:var(--crit);background:var(--crit-soft);border-color:var(--crit-line)}
+@media (max-width:760px){ .dh-l{width:150px} .dh-r{width:130px} }
+
+/* ---------- setup page ---------- */
+.admin-cols{display:grid;grid-template-columns:minmax(290px,.8fr) minmax(430px,1.35fr);gap:12px;align-items:start}
+.admin-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+@media (max-width:1040px){ .admin-cols{grid-template-columns:1fr} }
+.tscroll{overflow-x:auto;overflow-y:hidden}
+.tscroll.capped{max-height:320px;overflow-y:auto}
+.cellsel{width:100%;max-width:none;background:none;border:1px solid transparent;border-radius:var(--r);padding:3px 5px;font-size:12.5px}
+.cellsel:hover{border-color:var(--line);background:var(--surface)}
+.cellsel:focus{border-color:var(--accent);background:var(--surface);outline:none}
+.acct-table{min-width:410px}
+.acct-table th:nth-child(1),.acct-table td:nth-child(1){width:52px}
+.acct-table th:nth-child(3),.acct-table td:nth-child(3){width:160px}
+.acct-table th:nth-child(4),.acct-table td:nth-child(4){width:52px;text-align:right}
+.people-table{min-width:330px}
+.people-table th:nth-child(2),.people-table td:nth-child(2){width:126px}
+.people-table th:nth-child(3),.people-table td:nth-child(3){width:48px;text-align:right}
+.people-table th:nth-child(4),.people-table td:nth-child(4){width:30px}
+.reg-table{min-width:390px}
+.reg-table th:nth-child(4),.reg-table td:nth-child(4){width:48px;text-align:right}
+.owner-cell{display:flex;align-items:center;gap:6px;min-width:0}
+.steps{margin:12px 0;padding-left:18px;line-height:1.85;max-width:70ch;font-size:12.5px;color:var(--muted)}
+.steps strong{color:var(--ink)}
+table.plain{width:100%;border-collapse:collapse;font-size:13px}
+table.plain th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);font-weight:600}
+table.plain td{padding:6px 8px;border-bottom:1px solid var(--line)}
+table.plain tr:last-child td{border-bottom:0}
+#railToggle{display:none}
+.railbackdrop{display:none}
+
+@media (max-width:900px){
+  #app{grid-template-columns:1fr}
+  #rail{position:fixed;left:0;top:0;bottom:0;width:250px;z-index:90;transform:translateX(-100%);transition:transform .2s}
+  #rail.on{transform:none}
+  .railbackdrop.on{display:block;position:fixed;inset:0;background:rgba(10,20,20,.4);z-index:85}
+  #railToggle{display:grid}
+  #viewport{padding:14px 16px 64px}
+  #topbar{padding:10px 16px}
+  .props{grid-template-columns:1fr;gap:4px}
+  .props > label{margin-top:6px}
+  .form-grid{grid-template-columns:1fr}
+  .cal-cell{min-height:70px}
+  .search{order:9;width:100%;min-width:0}
+}
+/* ---------- sign in ---------- */
+#gate{position:fixed;inset:0;z-index:300;display:none;place-items:center;background:var(--ground);padding:24px 16px;overflow-y:auto}
+#gate.on{display:grid}
+.gate-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-2);padding:28px 26px}
+.gate-brand{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.gate-brand .brand-mark{width:32px;height:32px;border-radius:8px}
+.gate-brand .brand-mark svg{width:18px;height:18px}
+.gate-card h1{margin:0;font-size:17px;font-weight:600;letter-spacing:-.015em;line-height:1.2}
+.gate-card .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.gate-card h2{margin:0 0 6px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.gate-card p{margin:0 0 16px;font-size:13px;color:var(--ink-2);line-height:1.55}
+.gate-card label{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.03em;margin-bottom:4px}
+.gate-card input{width:100%;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);padding:9px 11px;font-size:14px;font-family:inherit}
+.gate-card input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.gate-card .btn{width:100%;justify-content:center;padding:9px;margin-top:12px;font-size:14px}
+.gate-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+.gate-msg{font-size:12.5px;padding:9px 11px;border-radius:var(--r);margin-top:12px;line-height:1.5}
+.gate-msg.ok{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
+.gate-msg.err{background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit-line)}
+#bootMsg{position:fixed;inset:0;display:grid;place-items:center;background:var(--ground);z-index:400;padding:24px;text-align:center;color:var(--muted);font-size:13px}
+#bootMsg.hide{display:none}
+.spin{width:22px;height:22px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.offline{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--crit);color:#fff;padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:500;z-index:210;display:none}
+.offline.on{display:block}
+</style>
+</head>
+<body>
+
+<div id="bootMsg"><div><div class="spin"></div>Loading&hellip;</div></div>
+
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 5-8"/><path d="M3 21h18"/></svg>
+      </span>
+      <span>
+        <h1>Meter QA Review</h1>
+        <span class="sub">Weekly data quality</span>
+      </span>
+    </div>
+    <div id="gateBody"></div>
+  </div>
+</div>
+
+<div class="railbackdrop" id="railBackdrop"></div>
+<div id="app">
+  <aside id="rail">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 5-8"/><path d="M3 21h18"/></svg>
+      </span>
+      <span>
+        <span class="brand-name">Meter QA Review</span>
+        <span class="brand-sub">Weekly data quality</span>
+      </span>
+    </div>
+    <div class="rail-scroll">
+      <div class="rail-group" id="navViews"></div>
+      <div class="rail-group">
+        <div class="rail-head">
+          <span class="eyebrow">Accounts</span>
+          <button class="icon-btn" id="acctFilterClear" title="Show all accounts" style="width:20px;height:20px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div id="navAccounts"></div>
+      </div>
+    </div>
+    <div class="rail-foot">
+      <span class="avatar" id="meAvatar">?</span>
+      <span class="who">
+        <span class="who-name" id="meName">&nbsp;</span>
+        <span class="who-role" id="meRole"></span>
+      </span>
+      <button class="icon-btn" id="signOut" title="Sign out">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <div id="main">
+    <header id="topbar">
+      <button class="icon-btn" id="railToggle" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div>
+        <h1 class="view-title" id="viewTitle">Overview</h1>
+        <div class="view-sub" id="viewSub"></div>
+      </div>
+      <div class="topbar-spacer"></div>
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="searchInput" type="search" placeholder="Search issues, devices, refs" aria-label="Search issues">
+        <span class="kbd">/</span>
+      </label>
+      <button class="icon-btn" id="themeToggle" title="Toggle theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8.5 8.5 0 1111.2 3a6.6 6.6 0 009.8 9.8z"/></svg>
+      </button>
+      <button class="btn" id="exportBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>
+        Excel
+      </button>
+      <button class="btn btn-primary" id="newIssueBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Raise issue <span class="kbd" style="border-color:rgba(255,255,255,.4)">N</span>
+      </button>
+    </header>
+
+    <main id="viewport">
+      <div id="banners"></div>
+      <section class="pane" id="pane-dashboard"></section>
+      <section class="pane" id="pane-list"></section>
+      <section class="pane" id="pane-board"></section>
+      <section class="pane" id="pane-mine"></section>
+      <section class="pane" id="pane-calendar"></section>
+      <section class="pane" id="pane-timeline"></section>
+      <section class="pane" id="pane-devices"></section>
+      <section class="pane" id="pane-review"></section>
+      <section class="pane" id="pane-admin"></section>
+    </main>
+  </div>
+</div>
+
+<div id="scrim"></div>
+<aside id="drawer" aria-label="Issue detail" aria-hidden="true"></aside>
+<div id="modal" role="dialog" aria-modal="true"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="offline" id="offline">Connection lost &mdash; changes are not being saved</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Meter QA Review — weekly data-quality issue tracker
+   Static page + Supabase. No server code.
+   ============================================================ */
+
+const CATEGORIES = [
+  {id:"manual-reads", name:"Manual reads",  color:"#8f6209"},
+  {id:"salesforce",   name:"Salesforce",    color:"#1f5c8b"},
+  {id:"iot",          name:"IoT",           color:"#0d6e63"},
+  {id:"missing-data", name:"Missing data",  color:"#a52c39"},
+  {id:"unusual-trend",name:"Unusual trend", color:"#6c3d9e"}
+];
+const CAT = Object.fromEntries(CATEGORIES.map(c=>[c.id,c]));
+
+const STATUSES = [
+  {id:"open",   name:"Open",        cls:"s-open",   color:"#8f6209"},
+  {id:"prog",   name:"In progress", cls:"s-prog",   color:"#1f5c8b"},
+  {id:"closed", name:"Closed",      cls:"s-closed", color:"#2c7a51"}
+];
+const ST = Object.fromEntries(STATUSES.map(s=>[s.id,s]));
+
+const PRIORITIES = [
+  {id:"urgent", name:"Urgent", cls:"p-urgent", rank:0, color:"#a52c39"},
+  {id:"high",   name:"High",   cls:"p-high",   rank:1, color:"#a8500f"},
+  {id:"medium", name:"Medium", cls:"p-medium", rank:2, color:"#8f6209"},
+  {id:"low",    name:"Low",    cls:"p-low",    rank:3, color:"#5b6f72"}
+];
+const PR = Object.fromEntries(PRIORITIES.map(p=>[p.id,p]));
+
+const RECURRENCE = [
+  {id:"none", name:"Does not repeat"},
+  {id:"weekly", name:"Weekly"},
+  {id:"monthly", name:"Monthly"},
+  {id:"quarterly", name:"Quarterly"}
+];
+
+const AVATAR_COLORS = ["#0d6e63","#1f5c8b","#a52c39","#6c3d9e","#8f6209","#2c7a51","#b1457b","#3c5a99"];
+
+/* ---------- tiny helpers ---------- */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const uid = p => p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const todayISO = ()=> new Date().toISOString().slice(0,10);
+const iso = d => d.toISOString().slice(0,10);
+function parseISO(s){ if(!s) return null; const d=new Date(s+"T00:00:00"); return isNaN(d)?null:d; }
+function fmtDate(s){ const d=parseISO(s); if(!d) return "—";
+  return d.toLocaleDateString("en-IE",{day:"2-digit",month:"short"}); }
+function fmtDateLong(s){ const d=parseISO(s); if(!d) return "—";
+  return d.toLocaleDateString("en-IE",{day:"numeric",month:"long",year:"numeric"}); }
+function fmtStamp(ms){ if(!ms) return ""; const d=new Date(ms);
+  return d.toLocaleDateString("en-IE",{day:"2-digit",month:"short"})+" "+d.toLocaleTimeString("en-IE",{hour:"2-digit",minute:"2-digit"}); }
+function daysBetween(a,b){ return Math.round((b-a)/86400000); }
+function ageDays(issue){ return Math.max(0, daysBetween(new Date(issue.createdAt), new Date())); }
+function weeksCarried(issue){ return Math.floor(ageDays(issue)/7); }
+function mondayOf(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function initials(name){ return String(name||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?"; }
+function colorFor(id){ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0; return AVATAR_COLORS[h%AVATAR_COLORS.length]; }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2600); }
+function sortByPriorityThenAge(a,b){ const d=PR[a.priority].rank-PR[b.priority].rank; return d||(a.createdAt-b.createdAt); }
+/* ============================================================
+   SUPABASE DATA LAYER
+
+   The view code below works against one in-memory `state` object, exactly
+   as it did before. Everything here is the adapter: it loads the tables
+   once, maps snake_case rows onto the camelCase shapes the views expect,
+   subscribes to realtime changes, and turns edits back into SQL writes.
+   ============================================================ */
+const state = { users:{}, accounts:{}, sites:{}, meters:{}, issues:{}, sessions:{} };
+
+let sb = null;          // supabase client
+let ME = null;          // row from app_users for the signed-in person
+let AUTH_EMAIL = null;  // the address they signed in with
+
+const Store = {
+  ready: false,
+  online: true,
+  _subs: [],
+  onChange(fn){ this._subs.push(fn); },
+  _emit(){ this._subs.forEach(f=>{ try{ f(); }catch(e){ console.error(e); } }); }
+};
+
+/* ---------- row mapping ---------- */
+const ts = s => s ? new Date(s).getTime() : null;
+
+const mapUser    = r => ({id:r.id, name:r.name, role:r.role, email:r.email, active:r.active});
+const mapAccount = r => ({id:r.code, code:r.code, name:r.name, ownerId:r.owner_id});
+const mapSite    = r => ({id:r.id, accountCode:r.account_code, name:r.name});
+const mapDevice  = r => ({id:r.id, accountCode:r.account_code, siteId:r.site_id, ref:r.ref});
+
+function mapIssue(r){
+  const prev = state.issues[r.id];
+  return {
+    id:r.id, ref:r.ref, title:r.title, description:r.description||"",
+    accountCode:r.account_code, siteId:r.site_id, meterId:r.device_id,
+    category:r.category, priority:r.priority, status:r.status,
+    reporterId:r.reporter_id, ownerId:r.owner_id,
+    startDate:r.start_date, dueDate:r.due_date, recurrence:r.recurrence,
+    tags:r.tags||[], subtasks:r.subtasks||[],
+    createdAt:ts(r.created_at), closedAt:ts(r.closed_at),
+    /* comments and activity live in their own tables; keep whatever we
+       already loaded so a realtime issue update doesn't blank them */
+    comments: prev ? prev.comments : [],
+    activity: prev ? prev.activity : []
+  };
+}
+function mapSession(r){
+  const prev = state.sessions[r.id];
+  return {
+    id:r.id, date:r.session_date, title:r.title, status:r.status,
+    notes:r.notes||"", createdAt:ts(r.created_at), completedAt:ts(r.completed_at),
+    outcomes: prev ? prev.outcomes : {}
+  };
+}
+
+function issuePatchToRow(p){
+  const map = {
+    title:"title", description:"description", accountCode:"account_code",
+    siteId:"site_id", meterId:"device_id", category:"category", priority:"priority",
+    status:"status", reporterId:"reporter_id", ownerId:"owner_id",
+    startDate:"start_date", dueDate:"due_date", recurrence:"recurrence",
+    tags:"tags", subtasks:"subtasks", closedAt:"closed_at"
+  };
+  const row = {};
+  for(const k of Object.keys(p)){
+    if(!(k in map)) continue;
+    let v = p[k];
+    if(k==="closedAt") v = v ? new Date(v).toISOString() : null;
+    row[map[k]] = v;
+  }
+  return row;
+}
+
+/* ---------- error surface ---------- */
+function dbError(e, what){
+  console.error(what||"supabase", e);
+  const msg = (e && (e.message||e.error_description)) || "";
+  if(/JWT|token|expired/i.test(msg)){ toast("Your session expired. Sign in again."); return signOut(); }
+  if(/row-level security|violates row-level/i.test(msg)){
+    toast("You do not have permission for that."); return;
+  }
+  if(/Failed to fetch|NetworkError/i.test(msg)){ setOnline(false); return; }
+  toast(what ? (what+" failed. "+msg) : ("Could not save. "+msg));
+}
+function setOnline(ok){
+  Store.online = ok;
+  $("#offline").classList.toggle("on", !ok);
+}
+
+/* ---------- initial load ---------- */
+async function loadAll(){
+  const q = async (table, mapper, bucket, key) => {
+    const {data, error} = await sb.from(table).select("*");
+    if(error){ dbError(error, "Loading "+table); return; }
+    const out = {};
+    (data||[]).forEach(r=>{ const o = mapper(r); out[key?r[key]:r.id] = o; });
+    state[bucket] = out;
+  };
+  await Promise.all([
+    q("app_users", mapUser,    "users"),
+    q("accounts",  mapAccount, "accounts", "code"),
+    q("sites",     mapSite,    "sites"),
+    q("devices",   mapDevice,  "meters"),
+    q("issues",    mapIssue,   "issues"),
+    q("sessions",  mapSession, "sessions")
+  ]);
+
+  /* graft the child tables onto their parents */
+  const [{data:comments}, {data:activity}, {data:outcomes}] = await Promise.all([
+    sb.from("issue_comments").select("*").order("created_at",{ascending:true}),
+    sb.from("issue_activity").select("*").order("created_at",{ascending:true}),
+    sb.from("session_outcomes").select("*")
+  ]);
+  (comments||[]).forEach(applyComment);
+  (activity||[]).forEach(applyActivity);
+  (outcomes||[]).forEach(applyOutcome);
+
+  Store.ready = true;
+  setOnline(true);
+  Store._emit();
+}
+
+function applyComment(r){
+  const i = state.issues[r.issue_id]; if(!i) return;
+  if(i.comments.some(c=>c.id===r.id)) return;
+  i.comments.push({id:r.id, userId:r.author_id, text:r.body, at:ts(r.created_at)});
+  i.comments.sort((a,b)=>a.at-b.at);
+}
+function applyActivity(r){
+  const i = state.issues[r.issue_id]; if(!i) return;
+  if(i.activity.some(a=>a.id===r.id)) return;
+  i.activity.push({id:r.id, userId:r.actor_id, text:r.text, at:ts(r.created_at)});
+  i.activity.sort((a,b)=>a.at-b.at);
+}
+function applyOutcome(r){
+  const s = state.sessions[r.session_id]; if(!s) return;
+  s.outcomes[r.issue_id] = {o:r.outcome, note:r.note||""};
+}
+
+/* ---------- realtime ---------- */
+function subscribeAll(){
+  const ch = sb.channel("qa-all");
+  const on = (table, fn) => ch.on("postgres_changes", {event:"*", schema:"public", table}, fn);
+
+  const simple = (bucket, mapper, key) => payload=>{
+    const k = payload.eventType==="DELETE"
+      ? (key ? payload.old[key] : payload.old.id)
+      : (key ? payload.new[key] : payload.new.id);
+    if(payload.eventType==="DELETE") delete state[bucket][k];
+    else state[bucket][k] = mapper(payload.new);
+    safeRender();
+  };
+
+  on("app_users", simple("users",   mapUser));
+  on("accounts",  simple("accounts",mapAccount,"code"));
+  on("sites",     simple("sites",   mapSite));
+  on("devices",   simple("meters",  mapDevice));
+  on("issues",    simple("issues",  mapIssue));
+  on("sessions",  simple("sessions",mapSession));
+
+  on("issue_comments", p=>{
+    if(p.eventType==="DELETE"){
+      const i = state.issues[p.old.issue_id];
+      if(i) i.comments = i.comments.filter(c=>c.id!==p.old.id);
+    } else applyComment(p.new);
+    safeRender(); if(ui.openIssueId) renderDrawerIfIdle();
+  });
+  on("issue_activity", p=>{ if(p.eventType!=="DELETE") applyActivity(p.new); safeRender(); });
+  on("session_outcomes", p=>{
+    if(p.eventType==="DELETE"){
+      const s = state.sessions[p.old.session_id];
+      if(s) delete s.outcomes[p.old.issue_id];
+    } else applyOutcome(p.new);
+    safeRender();
+  });
+
+  ch.subscribe(status=>{
+    if(status==="SUBSCRIBED") setOnline(true);
+    if(status==="CHANNEL_ERROR"||status==="TIMED_OUT") setOnline(false);
+  });
+}
+function renderDrawerIfIdle(){
+  const a = document.activeElement;
+  if(a && a.closest && a.closest("#drawer")) return;
+  renderDrawer();
+}
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+function gate(html){ $("#gate").classList.add("on"); $("#gateBody").innerHTML = html; $("#bootMsg").classList.add("hide"); }
+function ungate(){ $("#gate").classList.remove("on"); $("#bootMsg").classList.add("hide"); }
+
+function signInScreen(msg){
+  gate(
+    '<h2>Sign in</h2>'+
+    '<p>Enter your Savills email address and we&rsquo;ll send you a sign-in link. No password to remember.</p>'+
+    '<label for="gateEmail">Work email</label>'+
+    '<input id="gateEmail" type="email" autocomplete="email" inputmode="email" placeholder="name@savills.ie">'+
+    '<button class="btn btn-primary" id="gateSend">Email me a sign-in link</button>'+
+    (msg||"")+
+    '<p class="gate-note">Only Savills addresses can open this workspace. '+
+    'If you sign in with anything else you will get in, but every page will be empty &mdash; '+
+    'access is enforced by the database, not the screen.</p>');
+  setTimeout(()=>{ const el=$("#gateEmail"); if(el) el.focus(); }, 40);
+}
+
+async function sendMagicLink(){
+  const email = ($("#gateEmail").value||"").trim().toLowerCase();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    $("#gateSend").insertAdjacentHTML("afterend",
+      '<div class="gate-msg err">That does not look like an email address.</div>');
+    return;
+  }
+  const btn = $("#gateSend"); btn.disabled = true; btn.textContent = "Sending…";
+  const {error} = await sb.auth.signInWithOtp({
+    email, options:{ emailRedirectTo: window.location.href.split("#")[0] }
+  });
+  if(error){
+    btn.disabled = false; btn.textContent = "Email me a sign-in link";
+    gate($("#gateBody").innerHTML);
+    signInScreen('<div class="gate-msg err">'+esc(error.message)+'</div>');
+    return;
+  }
+  gate('<h2>Check your inbox</h2>'+
+    '<p>We sent a sign-in link to <strong>'+esc(email)+'</strong>. Open it on this device and you are in.</p>'+
+    '<p class="gate-note">Nothing arrived? Give it a minute, then look in Junk &mdash; automated mail from new senders often lands there the first time. '+
+    '<button class="btn btn-sm" id="gateBack" style="width:auto;margin-top:10px">Try a different address</button></p>');
+}
+
+async function signOut(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.reload();
+}
+
+/* Ensure the app_users row exists. The database trigger creates it on first
+   sign-up; this covers the case where that has not landed yet. */
+async function ensureProfile(user){
+  let {data} = await sb.from("app_users").select("*").eq("id", user.id).maybeSingle();
+  if(!data){
+    const guess = (user.email||"").split("@")[0].replace(/[._]/g," ")
+      .replace(/\b\w/g, c=>c.toUpperCase());
+    const {data:ins, error} = await sb.from("app_users")
+      .insert({id:user.id, email:user.email, name:guess||user.email, role:"member"})
+      .select().maybeSingle();
+    if(error){ return null; }
+    data = ins;
+  }
+  return data ? mapUser(data) : null;
+}
+
+async function boot(){
+  const cfg = window.QA_CONFIG||{};
+  if(!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY ||
+     /abcdefgh|YOUR-/.test(cfg.SUPABASE_URL+cfg.SUPABASE_ANON_KEY)){
+    gate('<h2>Not configured yet</h2>'+
+      '<p>This app needs its database details before it can run. Open <code>config.js</code> '+
+      'and paste in the Project URL and anon key from your Supabase project.</p>'+
+      '<p class="gate-note">Step 2 of <strong>SETUP.md</strong> walks through it.</p>');
+    return;
+  }
+  sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
+  });
+
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ signInScreen(); return; }
+  await start(session.user);
+
+  sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_OUT") location.reload(); });
+}
+
+async function start(user){
+  AUTH_EMAIL = user.email;
+  $("#bootMsg").classList.remove("hide");
+  ME = await ensureProfile(user);
+  if(!ME){
+    gate('<h2>No access</h2>'+
+      '<p>You are signed in as <strong>'+esc(user.email)+'</strong>, but that address is not on an '+
+      'approved Savills domain, so this workspace has nothing to show you.</p>'+
+      '<button class="btn" id="gateOut">Sign out</button>'+
+      '<p class="gate-note">If you think this is wrong, ask whoever set the workspace up &mdash; '+
+      'the approved domains are one line in the database.</p>');
+    return;
+  }
+  await loadAll();
+  if(!Object.keys(state.accounts).length){
+    gate('<h2>Database is empty</h2>'+
+      '<p>Signed in fine, but no accounts came back. That usually means <code>schema.sql</code> '+
+      'has not been run yet, or it was run against a different project.</p>'+
+      '<button class="btn" id="gateOut">Sign out</button>');
+    return;
+  }
+  ungate();
+  subscribeAll();
+  setView("dashboard");
+  Store._emit();
+}
+
+/* ============================================================
+   DERIVED DATA
+   ============================================================ */
+const userName = id => (state.users[id] && state.users[id].name) || "Unassigned";
+const acctName = code => (state.accounts[code] && state.accounts[code].name) || code || "—";
+const siteName = id => (state.sites[id] && state.sites[id].name) || "";
+const meterRef = id => (state.meters[id] && state.meters[id].ref) || "";
+
+function allIssues(){ return Object.values(state.issues); }
+function accountsSorted(){ return Object.values(state.accounts).sort((a,b)=>Number(a.code)-Number(b.code)); }
+function usersSorted(){ return Object.values(state.users).sort((a,b)=>a.name.localeCompare(b.name)); }
+function openIssues(){ return allIssues().filter(i=>i.status!=="closed"); }
+function isAdmin(){ return !!(ME && ME.role==="admin"); }
+
+function ownerFor(accountCode){
+  const a = state.accounts[accountCode];
+  return (a && a.ownerId && state.users[a.ownerId]) ? a.ownerId : (ME?ME.id:null);
+}
+
+function orphanCount(){
+  const usedM = new Set(), usedS = new Set();
+  allIssues().forEach(i=>{ if(i.meterId) usedM.add(i.meterId); if(i.siteId) usedS.add(i.siteId); });
+  Object.values(state.meters).forEach(m=>{ if(usedM.has(m.id) && m.siteId) usedS.add(m.siteId); });
+  return Object.values(state.meters).filter(m=>!usedM.has(m.id)).length +
+         Object.values(state.sites).filter(s=>!usedS.has(s.id)).length;
+}
+
+function visibleIssues(){
+  let list = allIssues();
+  if(ui.account) list = list.filter(i=>i.accountCode===ui.account);
+  if(ui.q){
+    const q = ui.q.toLowerCase();
+    list = list.filter(i=>{
+      const hay = [i.ref,i.title,i.description,acctName(i.accountCode),i.accountCode,
+                   siteName(i.siteId),meterRef(i.meterId),(i.tags||[]).join(" "),
+                   CAT[i.category]?CAT[i.category].name:""].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  if(ui.cats.size) list = list.filter(i=>ui.cats.has(i.category));
+  if(ui.mineOnly && ME) list = list.filter(i=>i.ownerId===ME.id||i.reporterId===ME.id);
+  if(!ui.showClosed) list = list.filter(i=>i.status!=="closed");
+  return list;
+}
+
+/* ============================================================
+   UI STATE
+   ============================================================ */
+const ui = {
+  view:"dashboard", account:null, q:"", cats:new Set(),
+  mineOnly:false, showClosed:false, group:"account", collapsed:new Set(),
+  openIssueId:null, sessionId:null, sessionTab:"agenda",
+  calMonth:null, tlWeeks:12, dhWeeks:26, dhHealth:null
+};
+
+const VIEWS = [
+  {id:"dashboard", name:"Overview",  icon:'<path d="M3 13h6V3H3z"/><path d="M15 21h6V11h-6z"/><path d="M15 7h6V3h-6z"/><path d="M3 21h6v-4H3z"/>'},
+  {id:"list",      name:"Issues",    icon:'<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/>'},
+  {id:"board",     name:"Board",     icon:'<rect x="3" y="4" width="5" height="16" rx="1.4"/><rect x="10" y="4" width="5" height="10" rx="1.4"/><rect x="17" y="4" width="4" height="13" rx="1.4"/>'},
+  {id:"mine",      name:"My tasks",  icon:'<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>'},
+  {id:"calendar",  name:"Calendar",  icon:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'},
+  {id:"timeline",  name:"Timeline",  icon:'<path d="M4 7h10M4 12h16M4 17h7"/>'},
+  {id:"devices",   name:"Device health", icon:'<circle cx="12" cy="13" r="7"/><path d="M12 13l3.2-3.2"/><path d="M12 6V3"/><path d="M4.6 5.6l1.8 1.8"/><path d="M19.4 5.6l-1.8 1.8"/>'},
+  {id:"review",    name:"Weekly review", icon:'<path d="M9 11l2 2 4-4"/><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4"/>'},
+  {id:"admin",     name:"Setup",     icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 11-4 0v-.1A1.6 1.6 0 005.4 20l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 003 15a2 2 0 010-4 1.6 1.6 0 001.5-2.6l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 0010 4.6V4a2 2 0 114 0v.1a1.6 1.6 0 002.7 1.1l.1-.1a2 2 0 112.8 2.8l-.1.1A1.6 1.6 0 0021 11a2 2 0 010 4z"/>'}
+];
+
+function icon(paths, cls){ return '<svg class="'+(cls||"")+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+paths+'</svg>'; }
+function avatarHTML(userId, cls){
+  const u = state.users[userId];
+  if(!u) return '<span class="avatar none '+(cls||"")+'" title="Unassigned">–</span>';
+  return '<span class="avatar '+(cls||"")+'" style="background:'+colorFor(u.id)+'" title="'+esc(u.name)+'">'+esc(initials(u.name))+'</span>';
+}
+function statusPill(s){ const x=ST[s]||ST.open; return '<span class="pill '+x.cls+'"><span class="dot"></span>'+x.name+'</span>'; }
+function prioPill(p){ const x=PR[p]||PR.medium; return '<span class="pill '+x.cls+'">'+x.name+'</span>'; }
+function catChip(c){ const x=CAT[c]; if(!x) return ""; return '<span class="cat"><span class="bar" style="background:'+x.color+'"></span>'+x.name+'</span>'; }
+function dueHTML(i){
+  if(!i.dueDate) return '<span style="color:var(--muted)">—</span>';
+  const d = parseISO(i.dueDate), t = new Date(); t.setHours(0,0,0,0);
+  const diff = daysBetween(t,d);
+  let cls = "";
+  if(i.status!=="closed"){ if(diff<0) cls="overdue"; else if(diff<=2) cls="duesoon"; }
+  return '<span class="num '+cls+'">'+fmtDate(i.dueDate)+'</span>';
+}
+function locationLine(i){
+  const bits=[];
+  if(i.siteId && state.sites[i.siteId]) bits.push(siteName(i.siteId));
+  if(i.meterId && state.meters[i.meterId]) bits.push(meterRef(i.meterId));
+  return bits.join(" · ");
+}
+/* ============================================================
+   MUTATIONS — every one writes to Postgres and lets realtime bring
+   the change back. Local state is updated optimistically first so the
+   interface never feels like it is waiting on the network.
+   ============================================================ */
+async function logActivity(issueId, text){
+  if(!text) return;
+  const {data, error} = await sb.from("issue_activity")
+    .insert({issue_id:issueId, actor_id:ME.id, text}).select().maybeSingle();
+  if(error) return;              // an audit line failing must never block the edit
+  if(data) applyActivity(data);
+}
+
+async function createIssue(data){
+  const row = Object.assign({
+    title:"Untitled issue", description:"", category:"missing-data",
+    priority:"medium", status:"open", recurrence:"none",
+    start_date: todayISO(), tags:[], subtasks:[],
+    reporter_id: ME.id
+  }, issuePatchToRow(data||{}));
+  if(!row.owner_id) row.owner_id = ownerFor(row.account_code);
+
+  const {data:ins, error} = await sb.from("issues").insert(row).select().maybeSingle();
+  if(error){ dbError(error, "Raising the issue"); return null; }
+  const issue = mapIssue(ins);
+  state.issues[issue.id] = issue;
+  Store._emit();
+  await logActivity(issue.id, "raised the issue");
+  return issue;
+}
+
+async function updateIssue(id, partial, activityText){
+  const cur = state.issues[id]; if(!cur) return;
+  state.issues[id] = Object.assign({}, cur, partial);   // optimistic
+  Store._emit();
+  const row = issuePatchToRow(partial);
+  if(Object.keys(row).length){
+    const {error} = await sb.from("issues").update(row).eq("id", id);
+    if(error){ state.issues[id] = cur; Store._emit(); return dbError(error, "Saving the change"); }
+  }
+  if(activityText) await logActivity(id, activityText);
+}
+
+async function setStatus(id, status){
+  const cur = state.issues[id]; if(!cur || cur.status===status) return;
+  await updateIssue(id, {status, closedAt: status==="closed" ? Date.now() : null},
+                    "moved to "+ST[status].name);
+  if(status==="closed" && cur.recurrence && cur.recurrence!=="none") await spawnRecurrence(cur);
+}
+
+async function spawnRecurrence(src){
+  const step = {weekly:7, monthly:30, quarterly:91}[src.recurrence] || 0;
+  if(!step) return;
+  const shift = d => d ? iso(addDays(parseISO(d), step)) : null;
+  const next = await createIssue({
+    title:src.title, description:src.description, accountCode:src.accountCode,
+    siteId:src.siteId, meterId:src.meterId, category:src.category,
+    priority:src.priority, ownerId:src.ownerId,
+    startDate: shift(src.startDate) || todayISO(), dueDate: shift(src.dueDate),
+    recurrence:src.recurrence, tags:(src.tags||[]).slice(),
+    subtasks:(src.subtasks||[]).map(s=>({id:uid("s"), text:s.text, done:false}))
+  });
+  if(next) toast("Recurring check "+next.ref+" scheduled");
+}
+
+async function deleteIssue(id){
+  const {error} = await sb.from("issues").delete().eq("id", id);
+  if(error) return dbError(error, "Deleting the issue");
+  delete state.issues[id]; Store._emit();
+}
+
+async function addComment(issueId, text){
+  const {data, error} = await sb.from("issue_comments")
+    .insert({issue_id:issueId, author_id:ME.id, body:text}).select().maybeSingle();
+  if(error) return dbError(error, "Posting the comment");
+  if(data) applyComment(data);
+  Store._emit();
+}
+
+/* sites and devices are created on demand from whatever people type */
+async function resolveSite(accountCode, name){
+  const n = String(name||"").trim(); if(!n || !accountCode) return null;
+  const found = Object.values(state.sites).find(
+    s=>s.accountCode===accountCode && s.name.toLowerCase()===n.toLowerCase());
+  if(found) return found.id;
+  const {data, error} = await sb.from("sites")
+    .insert({account_code:accountCode, name:n}).select().maybeSingle();
+  if(error){
+    /* someone else created it a moment ago — take theirs */
+    const {data:again} = await sb.from("sites").select("*")
+      .eq("account_code",accountCode).ilike("name",n).maybeSingle();
+    if(again){ state.sites[again.id]=mapSite(again); return again.id; }
+    dbError(error, "Adding the site"); return null;
+  }
+  state.sites[data.id] = mapSite(data); Store._emit();
+  return data.id;
+}
+
+async function resolveMeter(accountCode, siteId, ref){
+  const r = String(ref||"").trim(); if(!r || !accountCode) return null;
+  const found = Object.values(state.meters).find(
+    m=>m.accountCode===accountCode && m.ref.toLowerCase()===r.toLowerCase());
+  if(found) return found.id;
+  const {data, error} = await sb.from("devices")
+    .insert({account_code:accountCode, site_id:siteId||null, ref:r}).select().maybeSingle();
+  if(error){
+    const {data:again} = await sb.from("devices").select("*")
+      .eq("account_code",accountCode).ilike("ref",r).maybeSingle();
+    if(again){ state.meters[again.id]=mapDevice(again); return again.id; }
+    dbError(error, "Registering the device"); return null;
+  }
+  state.meters[data.id] = mapDevice(data); Store._emit();
+  return data.id;
+}
+
+async function pruneRegister(){
+  const usedM = new Set(), usedS = new Set();
+  allIssues().forEach(i=>{ if(i.meterId) usedM.add(i.meterId); if(i.siteId) usedS.add(i.siteId); });
+  Object.values(state.meters).forEach(m=>{ if(usedM.has(m.id) && m.siteId) usedS.add(m.siteId); });
+  const deadM = Object.values(state.meters).filter(m=>!usedM.has(m.id)).map(m=>m.id);
+  const deadS = Object.values(state.sites).filter(s=>!usedS.has(s.id)).map(s=>s.id);
+  if(deadM.length){
+    const {error} = await sb.from("devices").delete().in("id", deadM);
+    if(error) return dbError(error, "Clearing devices"), 0;
+    deadM.forEach(id=>delete state.meters[id]);
+  }
+  if(deadS.length){
+    const {error} = await sb.from("sites").delete().in("id", deadS);
+    if(!error) deadS.forEach(id=>delete state.sites[id]);
+  }
+  Store._emit();
+  return deadM.length + deadS.length;
+}
+
+/* ---------- people & accounts ---------- */
+async function setUserRole(id, role){
+  const {error} = await sb.from("app_users").update({role}).eq("id", id);
+  if(error) return dbError(error, "Changing the role");
+  state.users[id] = Object.assign({}, state.users[id], {role});
+  if(ME && ME.id===id) ME = state.users[id];
+  Store._emit();
+}
+async function setUserName(id, name){
+  const {error} = await sb.from("app_users").update({name}).eq("id", id);
+  if(error) return dbError(error, "Renaming");
+  state.users[id] = Object.assign({}, state.users[id], {name});
+  if(ME && ME.id===id) ME = state.users[id];
+  Store._emit();
+}
+async function setAccountOwner(code, ownerId){
+  const {error} = await sb.from("accounts").update({owner_id: ownerId||null}).eq("code", code);
+  if(error) return dbError(error, "Reassigning the account");
+  state.accounts[code] = Object.assign({}, state.accounts[code], {ownerId: ownerId||null});
+  Store._emit();
+}
+async function removeUser(id){
+  for(const a of accountsSorted()) if(a.ownerId===id) await setAccountOwner(a.code, null);
+  const {error} = await sb.from("app_users").delete().eq("id", id);
+  if(error) return dbError(error, "Removing the person");
+  delete state.users[id]; Store._emit();
+}
+
+/* ---------- review sessions ---------- */
+async function createSession(dateStr){
+  const d = dateStr || todayISO();
+  const {data, error} = await sb.from("sessions").insert({
+    session_date:d, title:"Weekly QA review — "+fmtDateLong(d),
+    status:"live", notes:"", created_by:ME.id
+  }).select().maybeSingle();
+  if(error){ dbError(error, "Starting the review"); return null; }
+  const s = mapSession(data);
+  state.sessions[s.id] = s;
+  ui.sessionId = s.id; ui.sessionTab = "run";
+  Store._emit();
+  return s;
+}
+async function updateSession(id, patch){
+  const row = {};
+  if("status" in patch) row.status = patch.status;
+  if("notes"  in patch) row.notes  = patch.notes;
+  if("completedAt" in patch) row.completed_at = patch.completedAt ? new Date(patch.completedAt).toISOString() : null;
+  const {error} = await sb.from("sessions").update(row).eq("id", id);
+  if(error) return dbError(error, "Saving the review");
+  state.sessions[id] = Object.assign({}, state.sessions[id], patch);
+  Store._emit();
+}
+async function setOutcome(sessionId, issueId, o){
+  const s = state.sessions[sessionId]; if(!s) return;
+  const cur = s.outcomes[issueId];
+  if(cur && cur.o===o){
+    const {error} = await sb.from("session_outcomes").delete()
+      .eq("session_id",sessionId).eq("issue_id",issueId);
+    if(error) return dbError(error, "Clearing the outcome");
+    delete s.outcomes[issueId]; Store._emit();
+  } else {
+    const {error} = await sb.from("session_outcomes").upsert({
+      session_id:sessionId, issue_id:issueId, outcome:o,
+      note: cur?cur.note:"", decided_by:ME.id, decided_at:new Date().toISOString()
+    }, {onConflict:"session_id,issue_id"});
+    if(error) return dbError(error, "Recording the outcome");
+    s.outcomes[issueId] = {o, note: cur?cur.note:""}; Store._emit();
+  }
+  const i = state.issues[issueId]; if(!i) return;
+  const now = s.outcomes[issueId] ? s.outcomes[issueId].o : null;
+  if(now==="closed" && i.status!=="closed") await setStatus(issueId,"closed");
+  if(now!=="closed" && i.status==="closed") await setStatus(issueId,"open");
+  if(now==="deferred") await logActivity(issueId, "deferred at "+s.title);
+}
+async function setOutcomeNote(sessionId, issueId, note){
+  const s = state.sessions[sessionId]; if(!s) return;
+  const cur = s.outcomes[issueId] || {o:"open", note:""};
+  const {error} = await sb.from("session_outcomes").upsert({
+    session_id:sessionId, issue_id:issueId, outcome:cur.o, note,
+    decided_by:ME.id, decided_at:new Date().toISOString()
+  }, {onConflict:"session_id,issue_id"});
+  if(error) return dbError(error, "Saving the note");
+  s.outcomes[issueId] = {o:cur.o, note}; Store._emit();
+}
+
+/* ============================================================
+   RAIL + ROUTER
+   ============================================================ */
+function renderRail(){
+  const counts = {};
+  const open = openIssues();
+  counts.list = visibleIssues().length;
+  counts.mine = ME ? open.filter(i=>i.ownerId===ME.id).length : 0;
+  counts.review = Object.values(state.sessions).filter(s=>s.status!=="complete").length;
+
+  $("#navViews").innerHTML = VIEWS.filter(v=>v.id!=="admin"||true).map(v=>{
+    const n = counts[v.id];
+    return '<button class="nav-item" data-view="'+v.id+'" aria-current="'+(ui.view===v.id)+'">'+
+      icon(v.icon)+'<span>'+v.name+'</span>'+
+      (n ? '<span class="nav-count num">'+n+'</span>' : '')+'</button>';
+  }).join("");
+
+  const byAcct = {};
+  open.forEach(i=>{ byAcct[i.accountCode]=(byAcct[i.accountCode]||0)+1; });
+  $("#navAccounts").innerHTML = accountsSorted().map(a=>{
+    const n = byAcct[a.code]||0;
+    const overdue = open.some(i=>i.accountCode===a.code && i.dueDate && parseISO(i.dueDate) < new Date(todayISO()+"T00:00:00"));
+    return '<button class="acct-item" data-acct="'+a.code+'" aria-current="'+(ui.account===a.code)+'" title="'+esc(a.name)+' · '+n+' open">'+
+      '<span class="acct-code">'+a.code+'</span>'+
+      '<span class="acct-name">'+esc(a.name)+'</span>'+
+      (n ? '<span class="acct-dot" style="background:'+(overdue?'var(--crit)':'var(--accent)')+'"></span>' : '')+
+      '</button>';
+  }).join("");
+
+  $("#acctFilterClear").classList.toggle("hide", !ui.account);
+
+  if(ME){
+    $("#meAvatar").outerHTML = avatarHTML(ME.id).replace('class="avatar','id="meAvatar" class="avatar');
+    $("#meName").textContent = ME.name;
+    $("#meRole").textContent = (ME.role==="admin" ? "Administrator" : "Team member");
+  }
+}
+
+function setView(v){
+  ui.view = v;
+  $$(".pane").forEach(p=>p.classList.toggle("on", p.id==="pane-"+v));
+  render();
+  $("#rail").classList.remove("on"); $("#railBackdrop").classList.remove("on");
+  window.scrollTo(0,0);
+}
+
+const TITLES = {
+  dashboard:["Overview","Where the data-quality backlog stands right now"],
+  list:["Issues","Every logged issue, grouped and inline-editable"],
+  board:["Board","Drag an issue between states as it progresses"],
+  mine:["My tasks","Issues you own or raised, by when they are due"],
+  calendar:["Calendar","Issues placed on their due date"],
+  timeline:["Timeline","Start to due date across the coming weeks"],
+  devices:["Device health check","Every registered SavIQ device, and how its issues have run over time"],
+  review:["Weekly review","Run the call, then publish the carry-over report"],
+  admin:["Setup","People, account ownership and workspace data"]
+};
+
+function render(){
+  if(!ME || !Store.ready) return;
+  const [t,s] = TITLES[ui.view]||["",""];
+  $("#viewTitle").textContent = ui.account ? t+" · "+acctName(ui.account) : t;
+  $("#viewSub").textContent = s;
+  renderRail();
+  renderBanners();
+  ({dashboard:renderDashboard, list:renderList, board:renderBoard, mine:renderMine,
+    calendar:renderCalendar, timeline:renderTimeline, devices:renderDevices,
+    review:renderReview, admin:renderAdmin}[ui.view]||(()=>{}))();
+  if(ui.openIssueId && state.issues[ui.openIssueId]) renderDrawer();
+}
+
+function renderBanners(){
+  const b = [];
+  const unassigned = accountsSorted().filter(a=>!a.ownerId).length;
+  if(unassigned && isAdmin()){
+    b.push('<div class="banner"><strong>'+unassigned+' account'+(unassigned===1?" has":"s have")+' no owner.</strong>'+
+      '<span class="sp">Issues raised against them will not be assigned to anyone.</span>'+
+      '<button class="btn btn-sm" data-view-jump="admin">Assign owners</button></div>');
+  }
+  $("#banners").innerHTML = b.join("");
+}
+
+/* ============================================================
+   VIEW · OVERVIEW
+   ============================================================ */
+function renderDashboard(){
+  const list = ui.account ? allIssues().filter(i=>i.accountCode===ui.account) : allIssues();
+  const open = list.filter(i=>i.status!=="closed");
+  const thisWeek = mondayOf(new Date()).getTime();
+  const raisedWk = list.filter(i=>i.createdAt>=thisWeek).length;
+  const closedWk = list.filter(i=>i.closedAt && i.closedAt>=thisWeek).length;
+  const today = new Date(todayISO()+"T00:00:00");
+  const overdue = open.filter(i=>i.dueDate && parseISO(i.dueDate)<today);
+  const carried = open.filter(i=>weeksCarried(i)>=2);
+
+  if(!list.length){
+    $("#pane-dashboard").innerHTML = emptyState(
+      "No issues logged yet",
+      "Raise the first data-quality issue and it will appear here, on the board and in this week&rsquo;s review agenda.",
+      '<button class="btn btn-primary" data-act="new-issue">Raise an issue</button>');
+    return;
+  }
+
+  const tiles = [
+    {v:open.length, l:"Open issues", d:list.length+" logged in total", cls:"accent"},
+    {v:raisedWk, l:"Raised this week", d:"since "+fmtDate(iso(mondayOf(new Date())))},
+    {v:closedWk, l:"Closed this week", d:closedWk>=raisedWk?"keeping pace":"falling behind", cls:closedWk>=raisedWk?"ok":""},
+    {v:overdue.length, l:"Past due", d:overdue.length?"needs a date or a decision":"nothing overdue", cls:overdue.length?"crit":"ok"},
+    {v:carried.length, l:"Carried 2+ weeks", d:"discuss on the call", cls:carried.length?"warn":""}
+  ];
+
+  const byAcct = {};
+  open.forEach(i=>{ (byAcct[i.accountCode] = byAcct[i.accountCode]||{total:0,byStatus:{}}); byAcct[i.accountCode].total++;
+    byAcct[i.accountCode].byStatus[i.status]=(byAcct[i.accountCode].byStatus[i.status]||0)+1; });
+  const acctRows = Object.entries(byAcct).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
+  const acctMax = acctRows.length?acctRows[0][1].total:1;
+
+  const byCat = {};
+  open.forEach(i=>{ byCat[i.category]=(byCat[i.category]||0)+1; });
+  const catMax = Math.max(1, ...Object.values(byCat));
+
+  const buckets = [
+    {l:"0–6 days", t:i=>ageDays(i)<7, c:"var(--ok)"},
+    {l:"1–2 weeks", t:i=>ageDays(i)>=7&&ageDays(i)<21, c:"var(--warn)"},
+    {l:"3–5 weeks", t:i=>ageDays(i)>=21&&ageDays(i)<42, c:"#a8500f"},
+    {l:"6+ weeks",  t:i=>ageDays(i)>=42, c:"var(--crit)"}
+  ].map(b=>Object.assign(b,{n:open.filter(b.t).length}));
+  const bucketMax = Math.max(1, ...buckets.map(b=>b.n));
+
+  const attention = open.slice().sort((a,b)=>{
+    const ao = a.dueDate && parseISO(a.dueDate)<today ? 0:1;
+    const bo = b.dueDate && parseISO(b.dueDate)<today ? 0:1;
+    return ao-bo || sortByPriorityThenAge(a,b);
+  }).slice(0,8);
+
+  $("#pane-dashboard").innerHTML =
+    '<div class="grid-tiles">'+tiles.map(t=>
+      '<div class="tile '+(t.cls||"")+'"><span class="v">'+t.v+'</span><span class="l">'+t.l+'</span><span class="d">'+t.d+'</span></div>').join("")+'</div>'+
+    '<div class="dash-grid">'+
+      '<div class="card"><div class="card-head"><h3>Raised vs closed</h3><span class="eyebrow" style="margin-left:auto">Last 10 weeks</span></div>'+
+        '<div class="card-body">'+weeklyChart(list)+'</div></div>'+
+      '<div class="card"><div class="card-head"><h3>Open by account</h3><span class="eyebrow" style="margin-left:auto">Top 10</span></div>'+
+        '<div class="card-body">'+ (acctRows.length ? acctRows.map(([code,d])=>{
+            const seg = STATUSES.filter(s=>s.id!=="closed").map(s=>{
+              const n=d.byStatus[s.id]||0; if(!n) return "";
+              return '<span class="bar-fill" style="width:'+(n/acctMax*100)+'%;background:'+s.color+'" title="'+n+' '+s.name+'"></span>';
+            }).join("");
+            return '<button class="bar-row" style="width:100%;border:0;background:none;text-align:left" data-acct-jump="'+code+'">'+
+              '<span class="lab" title="'+esc(acctName(code))+'">'+esc(acctName(code))+'</span>'+
+              '<span class="bar-track">'+seg+'</span><span class="val">'+d.total+'</span></button>';
+          }).join("") : '<p class="hint">No open issues.</p>')+
+          '<div class="legend"><span><i style="background:'+ST.open.color+'"></i>Open</span><span><i style="background:'+ST.prog.color+'"></i>In progress</span></div>'+
+        '</div></div>'+
+      '<div class="card"><div class="card-head"><h3>Open by issue type</h3></div><div class="card-body">'+
+        CATEGORIES.map(c=>'<div class="bar-row"><span class="lab">'+c.name+'</span>'+
+          '<span class="bar-track"><span class="bar-fill" style="width:'+((byCat[c.id]||0)/catMax*100)+'%;background:'+c.color+'"></span></span>'+
+          '<span class="val">'+(byCat[c.id]||0)+'</span></div>').join("")+
+      '</div></div>'+
+      '<div class="card"><div class="card-head"><h3>How long issues have been open</h3></div><div class="card-body">'+
+        buckets.map(b=>'<div class="bar-row"><span class="lab">'+b.l+'</span>'+
+          '<span class="bar-track"><span class="bar-fill" style="width:'+(b.n/bucketMax*100)+'%;background:'+b.c+'"></span></span>'+
+          '<span class="val">'+b.n+'</span></div>').join("")+
+        '<p class="hint" style="margin:10px 0 0">Anything past two weeks should have a named blocker on the call.</p>'+
+      '</div></div>'+
+      '<div class="card" style="grid-column:1/-1"><div class="card-head"><h3>Needs attention first</h3>'+
+        '<button class="btn btn-sm btn-ghost" style="margin-left:auto" data-view-jump="list">Open issue list</button></div>'+
+        '<div class="card-body" style="padding:6px 8px">'+
+        (attention.length ? attention.map(i=>
+          '<div class="mrow" style="border:0;border-bottom:1px solid var(--line);border-radius:0;margin:0">'+
+            '<span class="mono" style="font-size:11px;color:var(--muted);width:56px;flex:none">'+i.ref+'</span>'+
+            '<button class="t" data-open="'+i.id+'">'+esc(i.title)+'</button>'+
+            catChip(i.category)+prioPill(i.priority)+statusPill(i.status)+
+            '<span class="mono" style="font-size:11px;color:var(--muted)">'+esc(acctName(i.accountCode))+'</span>'+
+            dueHTML(i)+avatarHTML(i.ownerId,"xs")+
+          '</div>').join("") : '<p class="hint" style="padding:10px">Nothing open. Good week.</p>')+
+        '</div></div>'+
+    '</div>';
+}
+
+function weeklyChart(list){
+  const weeks = [];
+  const start = mondayOf(new Date());
+  for(let k=9;k>=0;k--){ const s=addDays(start,-7*k); weeks.push({s:s.getTime(), e:addDays(s,7).getTime(), lab:fmtDate(iso(s))}); }
+  const data = weeks.map(w=>({
+    lab:w.lab,
+    raised:list.filter(i=>i.createdAt>=w.s&&i.createdAt<w.e).length,
+    closed:list.filter(i=>i.closedAt&&i.closedAt>=w.s&&i.closedAt<w.e).length
+  }));
+  const max = Math.max(1, ...data.flatMap(d=>[d.raised,d.closed]));
+  const W=560,H=170,PL=30,PB=28,PT=10,PRr=8;
+  const iw=W-PL-PRr, ih=H-PT-PB, bw=iw/data.length;
+  const ticks=[0,Math.ceil(max/2),max].filter((v,ix,a)=>a.indexOf(v)===ix);
+  let g="";
+  ticks.forEach(t=>{ const y=PT+ih-(t/max)*ih;
+    g+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PRr)+'" y2="'+y+'" stroke="var(--line)" stroke-width="1"/>'+
+       '<text x="'+(PL-6)+'" y="'+(y+3.5)+'" text-anchor="end" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+t+'</text>';
+  });
+  data.forEach((d,ix)=>{
+    const x=PL+ix*bw, w=Math.max(4,(bw-10)/2);
+    const hr=(d.raised/max)*ih, hc=(d.closed/max)*ih;
+    g+='<rect x="'+(x+4)+'" y="'+(PT+ih-hr)+'" width="'+w+'" height="'+Math.max(hr,d.raised?1.5:0)+'" rx="1.5" fill="'+ST.open.color+'"><title>'+d.lab+': '+d.raised+' raised</title></rect>';
+    g+='<rect x="'+(x+6+w)+'" y="'+(PT+ih-hc)+'" width="'+w+'" height="'+Math.max(hc,d.closed?1.5:0)+'" rx="1.5" fill="'+ST.closed.color+'"><title>'+d.lab+': '+d.closed+' closed</title></rect>';
+    if(ix%2===0) g+='<text x="'+(x+bw/2)+'" y="'+(H-9)+'" text-anchor="middle" font-size="9" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+d.lab+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="auto" role="img" aria-label="Issues raised versus closed over the last ten weeks" style="display:block;max-width:100%">'+g+'</svg>'+
+    '<div class="legend"><span><i style="background:'+ST.open.color+'"></i>Raised</span><span><i style="background:'+ST.closed.color+'"></i>Closed</span></div>';
+}
+
+function emptyState(title, body, action){
+  return '<div class="empty"><h3>'+title+'</h3><p>'+body+'</p>'+(action||"")+'</div>';
+}
+/* ============================================================
+   SHARED TOOLBAR
+   ============================================================ */
+function toolbarHTML(opts){
+  const o = opts||{};
+  let h = '<div class="toolbar">';
+  if(o.group){
+    h += '<div class="field"><label for="groupBy">Group by</label><select class="mini" id="groupBy">'+
+      [["account","Account"],["status","Status"],["category","Issue type"],["priority","Priority"],["owner","Owner"],["none","Nothing"]]
+      .map(([v,n])=>'<option value="'+v+'"'+(ui.group===v?" selected":"")+'>'+n+'</option>').join("")+'</select></div>';
+  }
+  h += '<div class="seg" role="group" aria-label="Scope">'+
+    '<button data-scope="all" aria-pressed="'+(!ui.mineOnly)+'">All issues</button>'+
+    '<button data-scope="mine" aria-pressed="'+ui.mineOnly+'">Mine</button></div>';
+  h += '<button class="chip-filter" data-toggle="closed" aria-pressed="'+ui.showClosed+'">Show closed</button>';
+  h += '<span style="width:1px;height:20px;background:var(--line)"></span>';
+  h += CATEGORIES.map(c=>'<button class="chip-filter" data-cat="'+c.id+'" aria-pressed="'+ui.cats.has(c.id)+'">'+
+        '<span style="width:7px;height:7px;border-radius:2px;background:'+c.color+';display:inline-block"></span>'+c.name+'</button>').join("");
+  if(ui.cats.size||ui.q||ui.account) h += '<button class="btn btn-sm btn-ghost" data-act="clear-filters">Clear filters</button>';
+  h += '</div>';
+  return h;
+}
+
+/* ============================================================
+   VIEW · ISSUES (LIST)
+   ============================================================ */
+const GROUPERS = {
+  account:  {key:i=>i.accountCode||"none", label:k=>k==="none"?"No account":acctName(k)+"  ·  "+k, order:(a,b)=>Number(a)-Number(b)},
+  status:   {key:i=>i.status, label:k=>ST[k]?ST[k].name:k, order:(a,b)=>STATUSES.findIndex(s=>s.id===a)-STATUSES.findIndex(s=>s.id===b)},
+  category: {key:i=>i.category, label:k=>CAT[k]?CAT[k].name:k, order:(a,b)=>CATEGORIES.findIndex(c=>c.id===a)-CATEGORIES.findIndex(c=>c.id===b)},
+  priority: {key:i=>i.priority, label:k=>PR[k]?PR[k].name:k, order:(a,b)=>PR[a].rank-PR[b].rank},
+  owner:    {key:i=>i.ownerId||"none", label:k=>k==="none"?"Unassigned":userName(k), order:(a,b)=>String(a).localeCompare(String(b))},
+  none:     {key:()=>"all", label:()=>"All issues", order:()=>0}
+};
+
+function renderList(){
+  const list = visibleIssues();
+  const pane = $("#pane-list");
+  if(!allIssues().length){
+    pane.innerHTML = toolbarHTML({group:true}) + emptyState("Nothing logged yet",
+      "Raise an issue against an account and it becomes part of this week&rsquo;s review agenda.",
+      '<button class="btn btn-primary" data-act="new-issue">Raise an issue</button>');
+    return;
+  }
+  const g = GROUPERS[ui.group];
+  const groups = {};
+  list.forEach(i=>{ const k=g.key(i); (groups[k]=groups[k]||[]).push(i); });
+  const keys = Object.keys(groups).sort(g.order);
+
+  let h = toolbarHTML({group:true});
+  if(!list.length){
+    h += emptyState("No issues match those filters","Widen the filters or clear them to see the full log.",
+      '<button class="btn" data-act="clear-filters">Clear filters</button>');
+    pane.innerHTML = h; return;
+  }
+  keys.forEach(k=>{
+    const rows = groups[k].sort(sortByPriorityThenAge);
+    const collapsed = ui.collapsed.has(ui.group+":"+k);
+    h += '<div class="lgroup'+(collapsed?" collapsed":"")+'">'+
+      '<div class="lgroup-head"><button class="tw" data-collapse="'+esc(ui.group+":"+k)+'">'+
+        icon('<path d="M6 9l6 6 6-6"/>',"caret")+
+        '<span class="lgroup-title">'+esc(g.label(k))+'</span>'+
+        '<span class="lgroup-n">'+rows.length+'</span></button></div>'+
+      '<div class="lscroll"><table class="ltable"><thead><tr>'+
+        '<th class="c-ref">Ref</th><th>Issue</th><th class="c-cat">Type</th><th class="c-st">Status</th>'+
+        '<th class="c-pr">Priority</th><th class="c-own">Owner</th><th class="c-due">Due</th><th class="c-age">Age</th>'+
+      '</tr></thead><tbody>'+
+      rows.map(i=>{
+        const w = weeksCarried(i);
+        return '<tr data-row="'+i.id+'" class="'+(i.status==="closed"?"done":"")+(ui.openIssueId===i.id?" sel":"")+'">'+
+          '<td class="mono" style="font-size:11px;color:var(--muted)">'+i.ref+'</td>'+
+          '<td><div class="ltitle">'+
+            '<button class="tick" data-tick="'+i.id+'" data-done="'+(i.status==="closed"?1:0)+'" aria-label="Mark closed">'+
+              icon('<path d="M20 6L9 17l-5-5"/>')+'</button>'+
+            '<button class="t" data-open="'+i.id+'" style="border:0;background:none;padding:0;text-align:left;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(i.title)+'</button>'+
+            (locationLine(i)?'<span class="sub">'+esc(locationLine(i))+'</span>':"")+
+            ((i.comments||[]).length?'<span class="sub" title="'+i.comments.length+' comments">💬 '+i.comments.length+'</span>':"")+
+            (i.status!=="closed"&&w>=2?'<span class="carry" title="carried '+w+' weekly reviews">'+w+'w</span>':"")+
+          '</div></td>'+
+          '<td>'+catChip(i.category)+'</td>'+
+          '<td><select class="mini" data-set-status="'+i.id+'" style="border-color:transparent;background:none;width:100%">'+
+            STATUSES.map(s=>'<option value="'+s.id+'"'+(i.status===s.id?" selected":"")+'>'+s.name+'</option>').join("")+'</select></td>'+
+          '<td><select class="mini" data-set-prio="'+i.id+'" style="border-color:transparent;background:none;width:100%">'+
+            PRIORITIES.map(p=>'<option value="'+p.id+'"'+(i.priority===p.id?" selected":"")+'>'+p.name+'</option>').join("")+'</select></td>'+
+          '<td>'+avatarHTML(i.ownerId,"xs")+'</td>'+
+          '<td>'+dueHTML(i)+'</td>'+
+          '<td class="num" style="font-size:11.5px;color:var(--muted)">'+ageDays(i)+'d</td>'+
+        '</tr>';
+      }).join("")+
+      '</tbody></table></div>'+
+      (ui.group==="account" && k!=="none" ? '<button class="ladd" data-quick-acct="'+k+'">+ Raise an issue on '+esc(acctName(k))+'</button>' : "")+
+      '</div>';
+  });
+  pane.innerHTML = h;
+}
+
+/* ============================================================
+   VIEW · BOARD
+   ============================================================ */
+function renderBoard(){
+  const list = visibleIssues();
+  let h = toolbarHTML({});
+  h += '<div class="board">'+STATUSES.map(s=>{
+    const rows = list.filter(i=>i.status===s.id).sort(sortByPriorityThenAge);
+    return '<div class="col" data-col="'+s.id+'">'+
+      '<div class="col-head"><span class="stripe" style="background:'+s.color+'"></span>'+
+        '<span class="t">'+s.name+'</span><span class="n">'+rows.length+'</span></div>'+
+      '<div class="col-body" data-drop="'+s.id+'">'+
+        rows.map(i=>{
+          const w = weeksCarried(i);
+          return '<div class="kcard" draggable="true" data-card="'+i.id+'">'+
+            '<div class="krow"><span class="mono" style="font-size:10.5px;color:var(--muted)">'+i.ref+'</span>'+catChip(i.category)+
+              (i.status!=="closed"&&w>=2?'<span class="carry" style="margin-left:auto">'+w+'w</span>':"")+'</div>'+
+            '<button class="kt" data-open="'+i.id+'" style="border:0;background:none;padding:0;text-align:left;color:inherit">'+esc(i.title)+'</button>'+
+            (locationLine(i)?'<div class="kmeta mono" style="font-size:10.5px">'+esc(locationLine(i))+'</div>':"")+
+            '<div class="krow">'+prioPill(i.priority)+
+              '<span class="kmeta mono" style="font-size:10.5px">'+esc(acctName(i.accountCode))+'</span></div>'+
+            '<div class="krow" style="border-top:1px solid var(--line);padding-top:6px">'+avatarHTML(i.ownerId,"xs")+
+              '<span class="kmeta">'+esc(i.ownerId?userName(i.ownerId):"Unassigned")+'</span>'+
+              '<span style="margin-left:auto">'+dueHTML(i)+'</span></div>'+
+          '</div>';
+        }).join("")+
+        (rows.length?"":'<p class="hint" style="padding:10px;text-align:center">Drop issues here</p>')+
+      '</div></div>';
+  }).join("")+'</div>';
+  $("#pane-board").innerHTML = h;
+  wireDnD();
+}
+
+function wireDnD(){
+  let dragId = null;
+  $$("#pane-board .kcard").forEach(c=>{
+    c.addEventListener("dragstart", e=>{ dragId=c.dataset.card; c.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; try{e.dataTransfer.setData("text/plain",dragId);}catch(x){} });
+    c.addEventListener("dragend", ()=>{ c.classList.remove("dragging"); dragId=null; $$(".col").forEach(k=>k.classList.remove("over")); });
+  });
+  $$("#pane-board .col-body").forEach(b=>{
+    b.addEventListener("dragover", e=>{ e.preventDefault(); b.closest(".col").classList.add("over"); });
+    b.addEventListener("dragleave", ()=>b.closest(".col").classList.remove("over"));
+    b.addEventListener("drop", e=>{
+      e.preventDefault(); b.closest(".col").classList.remove("over");
+      const id = dragId || e.dataTransfer.getData("text/plain");
+      if(id && state.issues[id]) setStatus(id, b.dataset.drop);
+    });
+  });
+}
+
+/* ============================================================
+   VIEW · MY TASKS
+   ============================================================ */
+function renderMine(){
+  if(!ME) return;
+  const mine = allIssues().filter(i=>(i.ownerId===ME.id||i.reporterId===ME.id) && (ui.showClosed||i.status!=="closed"))
+                          .filter(i=>!ui.account||i.accountCode===ui.account);
+  const today = new Date(todayISO()+"T00:00:00");
+  const endWeek = addDays(mondayOf(today),7);
+  const buckets = [
+    {id:"overdue", name:"Overdue",   test:i=>i.dueDate && parseISO(i.dueDate)<today},
+    {id:"today",   name:"Due today", test:i=>i.dueDate===todayISO()},
+    {id:"week",    name:"Rest of this week", test:i=>i.dueDate && parseISO(i.dueDate)>today && parseISO(i.dueDate)<endWeek},
+    {id:"later",   name:"Later",     test:i=>i.dueDate && parseISO(i.dueDate)>=endWeek},
+    {id:"nodate",  name:"No due date", test:i=>!i.dueDate}
+  ];
+  let h = '<div class="toolbar"><button class="chip-filter" data-toggle="closed" aria-pressed="'+ui.showClosed+'">Show closed</button>'+
+          '<span class="hint">'+mine.length+' issue'+(mine.length===1?"":"s")+' you own or raised</span></div>';
+  if(!mine.length){
+    h += emptyState("Your queue is clear","Nothing assigned to you is open. Issues you raise also land here.",
+      '<button class="btn btn-primary" data-act="new-issue">Raise an issue</button>');
+    $("#pane-mine").innerHTML = h; return;
+  }
+  buckets.forEach(b=>{
+    const rows = mine.filter(b.test).sort(sortByPriorityThenAge);
+    if(!rows.length) return;
+    h += '<div class="bucket"><div class="bucket-head"><h3'+(b.id==="overdue"?' style="color:var(--crit)"':"")+'>'+b.name+'</h3>'+
+         '<span class="n">'+rows.length+'</span></div>'+
+      rows.map(i=>'<div class="mrow">'+
+        '<button class="tick" data-tick="'+i.id+'" data-done="'+(i.status==="closed"?1:0)+'" aria-label="Mark closed">'+icon('<path d="M20 6L9 17l-5-5"/>')+'</button>'+
+        '<span class="mono" style="font-size:11px;color:var(--muted);width:56px;flex:none">'+i.ref+'</span>'+
+        '<button class="t" data-open="'+i.id+'">'+esc(i.title)+'</button>'+
+        catChip(i.category)+prioPill(i.priority)+
+        '<span class="mono" style="font-size:11px;color:var(--muted)">'+esc(acctName(i.accountCode))+'</span>'+
+        (i.ownerId!==ME.id?'<span class="tag">raised by you</span>':"")+
+        dueHTML(i)+'</div>').join("")+'</div>';
+  });
+  $("#pane-mine").innerHTML = h;
+}
+
+/* ============================================================
+   VIEW · CALENDAR
+   ============================================================ */
+function renderCalendar(){
+  if(!ui.calMonth){ const n=new Date(); ui.calMonth=new Date(n.getFullYear(),n.getMonth(),1); }
+  const m = ui.calMonth;
+  const list = visibleIssues().filter(i=>i.dueDate);
+  const byDay = {};
+  list.forEach(i=>{ (byDay[i.dueDate]=byDay[i.dueDate]||[]).push(i); });
+
+  const first = new Date(m.getFullYear(), m.getMonth(), 1);
+  const startCell = mondayOf(first);
+  const cells = [];
+  for(let k=0;k<42;k++){
+    const d = addDays(startCell,k);
+    if(k>=35 && d.getMonth()!==m.getMonth()) break;
+    cells.push(d);
+  }
+  const t = todayISO();
+  let h = '<div class="toolbar">'+
+    '<button class="btn btn-sm" data-cal="-1">&larr;</button>'+
+    '<strong style="min-width:150px;text-align:center">'+m.toLocaleDateString("en-IE",{month:"long",year:"numeric"})+'</strong>'+
+    '<button class="btn btn-sm" data-cal="1">&rarr;</button>'+
+    '<button class="btn btn-sm" data-cal="0">Today</button>'+
+    '<span class="hint">'+list.length+' issue'+(list.length===1?"":"s")+' with a due date</span></div>';
+  h += '<div class="cal"><div class="cal-dow">'+["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>'<div>'+d+'</div>').join("")+'</div><div class="cal-grid">';
+  cells.forEach(d=>{
+    const ds = iso(d), out = d.getMonth()!==m.getMonth();
+    const evs = (byDay[ds]||[]).sort(sortByPriorityThenAge);
+    h += '<div class="cal-cell'+(out?" out":"")+(ds===t?" today":"")+'">'+
+      '<span class="cal-d">'+d.getDate()+'</span>'+
+      evs.slice(0,3).map(i=>'<button class="cal-ev" data-open="'+i.id+'" style="border-left-color:'+(CAT[i.category]?CAT[i.category].color:"var(--slate)")+'" title="'+esc(i.ref+" · "+i.title+" · "+acctName(i.accountCode))+'">'+esc(i.title)+'</button>').join("")+
+      (evs.length>3?'<button class="cal-more" data-cal-day="'+ds+'">+'+(evs.length-3)+' more</button>':"")+
+      '</div>';
+  });
+  h += '</div></div>';
+  $("#pane-calendar").innerHTML = h;
+}
+
+/* ============================================================
+   VIEW · TIMELINE
+   ============================================================ */
+function renderTimeline(){
+  const list = visibleIssues().filter(i=>i.startDate||i.dueDate).sort((a,b)=>{
+    const as=parseISO(a.startDate||a.dueDate), bs=parseISO(b.startDate||b.dueDate); return as-bs;
+  });
+  const start = mondayOf(addDays(new Date(),-14));
+  const total = ui.tlWeeks*7;
+  const end = addDays(start, total);
+  let h = '<div class="toolbar"><div class="seg" role="group" aria-label="Range">'+
+    [[8,"8 weeks"],[12,"12 weeks"],[26,"6 months"]].map(([w,n])=>'<button data-tlw="'+w+'" aria-pressed="'+(ui.tlWeeks===w)+'">'+n+'</button>').join("")+
+    '</div><span class="hint">Bars run from start date to due date. Issues with neither are not shown.</span></div>';
+
+  if(!list.length){
+    $("#pane-timeline").innerHTML = h + emptyState("Nothing scheduled","Give an issue a start or due date and it will appear on the timeline.","");
+    return;
+  }
+  const months = [];
+  let cur = new Date(start);
+  while(cur < end){
+    const mEnd = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    const seg = Math.min(mEnd, end);
+    months.push({lab:cur.toLocaleDateString("en-IE",{month:"short",year:"2-digit"}), w:daysBetween(cur,seg)/total*100});
+    cur = seg;
+  }
+  const pct = d => Math.max(0, Math.min(100, daysBetween(start, d)/total*100));
+  h += '<div class="tl"><div class="tl-scroll"><div class="tl-inner">'+
+    '<div class="tl-head"><div class="tl-label">Issue</div><div class="tl-months">'+
+      months.map(m=>'<div class="tl-month" style="flex:0 0 '+m.w+'%">'+m.lab+'</div>').join("")+'</div></div>';
+  const todayPct = pct(new Date());
+  list.forEach(i=>{
+    const s = parseISO(i.startDate||i.dueDate);
+    const e = parseISO(i.dueDate||i.startDate);
+    const a = pct(s), b = Math.max(a+0.7, pct(addDays(e,1)));
+    const col = i.status==="closed" ? ST.closed.color : (CAT[i.category]?CAT[i.category].color:"var(--slate)");
+    h += '<div class="tl-row"><div class="tl-rlabel">'+
+        '<span class="mono" style="font-size:10.5px;color:var(--muted);flex:none">'+i.ref+'</span>'+
+        '<button class="t" data-open="'+i.id+'">'+esc(i.title)+'</button></div>'+
+      '<div class="tl-track">'+
+        '<span class="tl-today" style="left:'+todayPct+'%"></span>'+
+        '<button class="tl-bar" data-open="'+i.id+'" style="left:'+a+'%;width:'+(b-a)+'%;background:'+col+';opacity:'+(i.status==="closed"?.45:1)+'" title="'+esc(i.ref+" · "+fmtDateLong(i.startDate)+" → "+fmtDateLong(i.dueDate))+'">'+esc(acctName(i.accountCode))+'</button>'+
+      '</div></div>';
+  });
+  h += '</div></div></div>';
+  $("#pane-timeline").innerHTML = h;
+}
+/* ============================================================
+   VIEW · DEVICE HEALTH CHECK
+   A lane per SavIQ device. Each bar is one issue, running from the day it
+   was raised to the day it was resolved (or to today if it is still open),
+   so a device that keeps breaking reads as a row of repeated bars.
+   ============================================================ */
+const HEALTH = {
+  crit:  {name:"Needs attention", cls:"h-crit",  rank:0, color:"var(--crit)"},
+  risk:  {name:"Open issue",      cls:"h-risk",  rank:1, color:"var(--info)"},
+  watch: {name:"Repeat offender", cls:"h-watch", rank:2, color:"var(--warn)"},
+  good:  {name:"Healthy",         cls:"h-good",  rank:3, color:"var(--ok)"}
+};
+
+function deviceStats(m, fromTs){
+  const issues = allIssues().filter(i=>i.meterId===m.id).sort((a,b)=>a.createdAt-b.createdAt);
+  const open = issues.filter(i=>i.status!=="closed");
+  const closed = issues.filter(i=>i.status==="closed" && i.closedAt);
+  const days = closed.map(i=>Math.max(0, Math.round((i.closedAt-i.createdAt)/86400000)));
+  const avg = days.length ? Math.round(days.reduce((a,b)=>a+b,0)/days.length) : null;
+  const oldestOpen = open.length ? Math.max(...open.map(ageDays)) : 0;
+  const inWindow = issues.filter(i=>i.createdAt>=fromTs || (i.closedAt||Date.now())>=fromTs);
+  let health = "good";
+  if(open.some(i=>i.priority==="urgent"||i.priority==="high") || oldestOpen>=28) health = "crit";
+  else if(open.length) health = "risk";
+  else if(inWindow.length>=2) health = "watch";
+  return {issues, open, closed, avg, oldestOpen, inWindow, health};
+}
+
+function renderDevices(){
+  const pane = $("#pane-devices");
+  const weeks = ui.dhWeeks || 26;
+  const end = new Date(); end.setHours(23,59,59,999);
+  const start = mondayOf(addDays(end, -7*weeks));
+  const fromTs = start.getTime(), span = end.getTime()-fromTs;
+
+  let devices = Object.values(state.meters);
+  if(ui.account) devices = devices.filter(m=>m.accountCode===ui.account);
+  if(ui.q){
+    const q = ui.q.toLowerCase();
+    devices = devices.filter(m=>(m.ref+" "+siteName(m.siteId)+" "+acctName(m.accountCode)).toLowerCase().includes(q));
+  }
+
+  const rows = devices.map(m=>Object.assign({m}, deviceStats(m, fromTs)));
+  const counts = {crit:0, risk:0, watch:0, good:0};
+  rows.forEach(r=>counts[r.health]++);
+  const shown = ui.dhHealth ? rows.filter(r=>r.health===ui.dhHealth) : rows;
+
+  let h = '<div class="toolbar">'+
+    '<div class="seg" role="group" aria-label="Time range">'+
+      [[13,"3 months"],[26,"6 months"],[52,"12 months"]].map(([w,n])=>
+        '<button data-dhw="'+w+'" aria-pressed="'+(weeks===w)+'">'+n+'</button>').join("")+'</div>'+
+    Object.keys(HEALTH).map(k=>'<button class="chip-filter" data-dhh="'+k+'" aria-pressed="'+(ui.dhHealth===k)+'">'+
+      '<span style="width:7px;height:7px;border-radius:50%;background:'+HEALTH[k].color+';display:inline-block"></span>'+
+      HEALTH[k].name+' <span class="num">'+counts[k]+'</span></button>').join("")+
+    (ui.dhHealth?'<button class="btn btn-sm btn-ghost" data-act="dh-clear">Show all</button>':"")+
+    '<span class="topbar-spacer"></span>'+
+    '<button class="btn btn-primary btn-sm" data-act="add-devices">'+
+      icon('<path d="M12 5v14M5 12h14"/>')+' Register devices</button>'+
+    '</div>';
+
+  if(!Object.keys(state.meters).length){
+    pane.innerHTML = h + emptyState("No devices registered yet",
+      "Register your SavIQ devices and every issue raised against one lands on its lane here, so you can see which devices keep breaking and how long they take to fix. Devices are also added automatically the first time someone types a device key on an issue.",
+      '<button class="btn btn-primary" data-act="add-devices">Register devices</button>');
+    return;
+  }
+
+  const resolved = rows.flatMap(r=>r.closed);
+  const avgAll = resolved.length
+    ? Math.round(resolved.reduce((a,i)=>a+Math.max(0,(i.closedAt-i.createdAt)/86400000),0)/resolved.length) : null;
+
+  h += '<div class="grid-tiles">'+
+    '<div class="tile accent"><span class="v">'+rows.length+'</span><span class="l">Devices registered</span>'+
+      '<span class="d">'+(ui.account?esc(acctName(ui.account)):"across all accounts")+'</span></div>'+
+    '<div class="tile ok"><span class="v">'+counts.good+'</span><span class="l">Healthy</span><span class="d">no issues in this window</span></div>'+
+    '<div class="tile crit"><span class="v">'+(counts.crit+counts.risk)+'</span><span class="l">With an open issue</span>'+
+      '<span class="d">'+counts.crit+' need attention</span></div>'+
+    '<div class="tile warn"><span class="v">'+counts.watch+'</span><span class="l">Repeat offenders</span><span class="d">fixed, but broke twice</span></div>'+
+    '<div class="tile"><span class="v">'+(avgAll===null?"—":avgAll)+'</span><span class="l">Avg days to resolve</span>'+
+      '<span class="d">'+resolved.length+' resolved</span></div>'+
+    '</div>';
+
+  /* month ruler */
+  const months = [];
+  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  if(cur < start) cur = new Date(start);
+  while(cur < end){
+    const mEnd = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    const segEnd = mEnd < end ? mEnd : end;
+    months.push({lab: cur.toLocaleDateString("en-IE",{month:"short"}),
+                 w: (segEnd-cur)/span*100,
+                 left: (cur-fromTs)/span*100});
+    cur = segEnd;
+  }
+  const pct = ts => Math.max(0, Math.min(100, (ts-fromTs)/span*100));
+
+  h += '<div class="dh"><div class="dh-scroll"><div class="dh-inner">'+
+    '<div class="dh-head"><div class="dh-l">Device</div>'+
+      '<div class="dh-track" style="height:34px">'+months.map(m=>
+        '<span class="dh-month" style="left:'+m.left+'%;width:'+m.w+'%">'+m.lab+'</span>').join("")+'</div>'+
+      '<div class="dh-r">Issues · Avg fix</div></div>';
+
+  if(!shown.length){
+    h += '<div class="dh-lane"><div style="padding:16px;color:var(--muted);font-size:13px">No devices match that filter.</div></div>';
+  }
+
+  groupByAccount(shown.map(r=>({accountCode:r.m.accountCode, _r:r}))).forEach(([code, items])=>{
+    h += '<div class="dh-group"><span class="mono" style="font-size:11px;color:var(--muted)">'+code+'</span>'+
+         esc(acctName(code))+'<span class="lgroup-n">'+items.length+'</span></div>';
+    items.map(x=>x._r).sort((a,b)=>HEALTH[a.health].rank-HEALTH[b.health].rank || b.issues.length-a.issues.length)
+      .forEach(r=>{
+        const m = r.m;
+        h += '<div class="dh-lane">'+
+          '<div class="dh-l">'+
+            '<span class="dh-key" title="'+esc(m.ref)+'">'+esc(m.ref)+'</span>'+
+            '<span class="dh-site">'+esc(siteName(m.siteId)||"No site recorded")+'</span>'+
+          '</div>'+
+          '<div class="dh-track">'+
+            months.map(mo=>'<span class="dh-gl" style="left:'+mo.left+'%"></span>').join("")+
+            '<span class="dh-now" style="left:'+pct(Date.now())+'%" title="today"></span>'+
+            r.issues.map(i=>{
+              const s = i.createdAt, e = (i.status==="closed" && i.closedAt) ? i.closedAt : Date.now();
+              if(e < fromTs) return "";
+              const a = pct(s), b = Math.max(a+0.6, pct(e));
+              const col = i.status==="closed" ? "var(--ok)"
+                        : (i.priority==="urgent"||i.priority==="high") ? "var(--crit)"
+                        : i.status==="prog" ? "var(--info)" : "var(--warn)";
+              const dur = Math.max(0, Math.round((e-s)/86400000));
+              const tip = i.ref+" · "+i.title+" · "+(CAT[i.category]||{}).name+
+                          " · raised "+fmtDate(iso(new Date(s)))+
+                          (i.status==="closed" ? " · resolved "+fmtDate(iso(new Date(e)))+" ("+dur+"d)"
+                                               : " · still open ("+dur+"d)");
+              return '<button class="dh-bar" data-open="'+i.id+'" style="left:'+a+'%;width:'+(b-a)+'%;background:'+col+'" title="'+esc(tip)+'">'+
+                (i.status==="closed"?'<span class="dh-tick">'+icon('<path d="M20 6L9 17l-5-5"/>')+'</span>':"")+'</button>';
+            }).join("")+
+          '</div>'+
+          '<div class="dh-r">'+
+            '<span class="pill '+HEALTH[r.health].cls+'" title="'+(r.oldestOpen?("oldest open issue: "+r.oldestOpen+" days"):"")+'">'+HEALTH[r.health].name+'</span>'+
+            '<span class="dh-nums"><span class="num">'+r.issues.length+'</span>'+
+              '<span class="num" style="color:var(--muted)">'+(r.avg===null?"—":r.avg+"d")+'</span></span>'+
+          '</div></div>';
+      });
+  });
+
+  h += '</div></div>'+
+    '<div class="legend" style="padding:10px 12px;border-top:1px solid var(--line);margin:0">'+
+      '<span><i style="background:var(--warn)"></i>Open</span>'+
+      '<span><i style="background:var(--info)"></i>In progress</span>'+
+      '<span><i style="background:var(--crit)"></i>Open, high or urgent</span>'+
+      '<span><i style="background:var(--ok)"></i>Resolved — bar ends on the fix</span>'+
+      '<span style="color:var(--muted)">Bar length is how long the issue was live.</span>'+
+    '</div></div>';
+  pane.innerHTML = h;
+}
+
+/* Register devices without waiting for an issue to create them */
+function addDevicesModal(){
+  showModal('<div class="sheet"><div class="sheet-head"><h3>Register SavIQ devices</h3>'+
+    '<span class="topbar-spacer"></span><button class="icon-btn" data-act="close-modal">'+icon('<path d="M18 6L6 18M6 6l12 12"/>')+'</button></div>'+
+    '<div class="sheet-body"><div class="form-grid">'+
+      '<div class="fl"><label for="adAcct">Account</label><select id="adAcct"><option value="">— pick —</option>'+
+        accountsSorted().map(a=>'<option value="'+a.code+'"'+(ui.account===a.code?" selected":"")+'>'+a.code+" · "+esc(a.name)+'</option>').join("")+'</select></div>'+
+      '<div class="fl"><label for="adSite">Site <span style="font-weight:400">(optional)</span></label>'+
+        '<input id="adSite" list="adSiteList" placeholder="applies to all keys below"><datalist id="adSiteList">'+
+        Object.values(state.sites).map(s=>'<option value="'+esc(s.name)+'"></option>').join("")+'</datalist></div>'+
+      '<div class="fl full"><label for="adKeys">SavIQ Device Keys</label>'+
+        '<textarea id="adKeys" rows="8" data-autofocus placeholder="One key per line — paste a column straight from Excel."></textarea></div>'+
+    '</div><p class="hint" style="margin:10px 0 0">Keys that already exist on this account are skipped, so you can safely paste the same list twice.</p></div>'+
+    '<div class="sheet-foot"><button class="btn" data-act="close-modal">Cancel</button>'+
+      '<button class="btn btn-primary" data-act="save-devices">Register devices</button></div></div>');
+}
+
+async function saveDevices(){
+  const accountCode = $("#adAcct").value;
+  if(!accountCode){ toast("Pick the account these devices belong to."); $("#adAcct").focus(); return; }
+  const keys = $("#adKeys").value.split(/[\n,;\t]/).map(k=>k.trim()).filter(Boolean);
+  if(!keys.length){ toast("Paste at least one device key."); $("#adKeys").focus(); return; }
+  const siteId = await resolveSite(accountCode, $("#adSite").value);
+  const before = Object.keys(state.meters).length;
+  for(const k of keys) await resolveMeter(accountCode, siteId, k);
+  const added = Object.keys(state.meters).length - before;
+  closeModal();
+  toast(added+" device"+(added===1?"":"s")+" registered"+(keys.length-added?" · "+(keys.length-added)+" already known":""));
+  setView("devices");
+}
+/* ============================================================
+   VIEW · WEEKLY REVIEW
+   ============================================================ */
+function sessionsSorted(){ return Object.values(state.sessions).sort((a,b)=>b.date.localeCompare(a.date)); }
+function sessionAgenda(s){
+  /* everything still open at the moment the agenda is drawn, plus anything
+     already given an outcome in this session (so closed items stay visible) */
+  const ids = new Set(Object.keys(s.outcomes||{}));
+  return allIssues()
+    .filter(i=>i.status!=="closed" || ids.has(i.id))
+    .filter(i=>i.createdAt <= new Date(s.date+"T23:59:59").getTime() || ids.has(i.id))
+    .sort((a,b)=>{
+      const ac=Number(a.accountCode)-Number(b.accountCode);
+      return ac || sortByPriorityThenAge(a,b);
+    });
+}
+
+function renderReview(){
+  const pane = $("#pane-review");
+  const sessions = sessionsSorted();
+  const s = ui.sessionId ? state.sessions[ui.sessionId] : null;
+
+  if(!s){
+    const thisMonday = iso(mondayOf(new Date()));
+    const haveThisWeek = sessions.some(x=>x.date>=thisMonday);
+    let h = '<div class="toolbar">'+
+      '<button class="btn btn-primary" data-act="new-session">'+icon('<path d="M12 5v14M5 12h14"/>')+
+        (haveThisWeek?"Start another review":"Start this week&rsquo;s review")+'</button>'+
+      '<span class="hint">Each review stamps every open issue with an outcome, so carry-over is counted, not remembered.</span></div>';
+    if(!sessions.length){
+      h += emptyState("No reviews yet",
+        "Start a review before your call. The agenda is built from every open issue, grouped by account and ordered by priority and age.",
+        '<button class="btn btn-primary" data-act="new-session">Start this week&rsquo;s review</button>');
+    } else {
+      h += '<div class="sess-list">'+sessions.map(x=>{
+        const d = parseISO(x.date);
+        const out = Object.values(x.outcomes||{});
+        const closed = out.filter(o=>o.o==="closed").length;
+        const carried = out.filter(o=>o.o==="open").length;
+        const deferred = out.filter(o=>o.o==="deferred").length;
+        return '<button class="sess'+(x.status==="live"?" live":"")+'" data-session="'+x.id+'" style="width:100%;text-align:left;cursor:pointer">'+
+          '<span class="dt">'+d.toLocaleDateString("en-IE",{month:"short"})+'<b>'+d.getDate()+'</b>'+d.getFullYear()+'</span>'+
+          '<span class="body"><span class="t">'+esc(x.title)+'</span>'+
+            '<span class="m"><span>'+out.length+' reviewed</span><span style="color:var(--ok)">'+closed+' closed</span>'+
+            '<span style="color:var(--warn)">'+carried+' carried</span><span>'+deferred+' deferred</span></span></span>'+
+          '<span class="pill '+(x.status==="complete"?"s-closed":"s-prog")+'"><span class="dot"></span>'+(x.status==="complete"?"Complete":"In progress")+'</span>'+
+        '</button>';
+      }).join("")+'</div>';
+    }
+    pane.innerHTML = h; return;
+  }
+
+  const agenda = sessionAgenda(s);
+  let h = '<div class="toolbar">'+
+    '<button class="btn btn-sm btn-ghost" data-act="back-sessions">'+icon('<path d="M15 18l-6-6 6-6"/>')+' All reviews</button>'+
+    '<strong>'+esc(s.title)+'</strong>'+
+    '<div class="seg" role="group" aria-label="Review stage">'+
+      [["agenda","Agenda"],["run","Run the call"],["summary","Summary &amp; report"]].map(([v,n])=>
+        '<button data-stab="'+v+'" aria-pressed="'+(ui.sessionTab===v)+'">'+n+'</button>').join("")+'</div>'+
+    '<span class="topbar-spacer"></span>'+
+    (s.status!=="complete"
+      ? '<button class="btn btn-primary btn-sm" data-act="complete-session">Mark review complete</button>'
+      : '<button class="btn btn-sm" data-act="reopen-session">Reopen review</button>')+
+    '</div>';
+
+  if(ui.sessionTab==="agenda")  h += reviewAgendaHTML(s, agenda);
+  if(ui.sessionTab==="run")     h += reviewRunHTML(s, agenda);
+  if(ui.sessionTab==="summary") h += reviewSummaryHTML(s);
+  pane.innerHTML = h;
+}
+
+function groupByAccount(list){
+  const g = {};
+  list.forEach(i=>{ (g[i.accountCode||"none"]=g[i.accountCode||"none"]||[]).push(i); });
+  return Object.entries(g).sort((a,b)=>Number(a[0])-Number(b[0]));
+}
+
+function reviewAgendaHTML(s, agenda){
+  if(!agenda.length) return emptyState("Nothing to review","No issues are open. Raise one, or mark the review complete.","");
+  const carried = agenda.filter(i=>weeksCarried(i)>=1).length;
+  let h = '<div class="grid-tiles">'+
+    '<div class="tile accent"><span class="v">'+agenda.length+'</span><span class="l">Items on the agenda</span></div>'+
+    '<div class="tile warn"><span class="v">'+carried+'</span><span class="l">Carried from a previous week</span></div>'+
+    '<div class="tile"><span class="v">'+groupByAccount(agenda).length+'</span><span class="l">Accounts affected</span></div>'+
+    '</div>';
+  groupByAccount(agenda).forEach(([code,rows])=>{
+    h += '<div class="agenda-acct"><h4><span class="mono" style="color:var(--muted);font-size:11px">'+code+'</span>'+esc(acctName(code))+
+      '<span class="lgroup-n">'+rows.length+'</span>'+
+      '<span style="margin-left:auto;font-weight:400;font-size:11.5px;color:var(--muted)">Owner: '+esc(userName((state.accounts[code]||{}).ownerId))+'</span></h4>'+
+      rows.map(i=>{
+        const w = weeksCarried(i);
+        return '<div class="wrow">'+
+          '<span class="mono" style="font-size:11px;color:var(--muted);width:56px;flex:none">'+i.ref+'</span>'+
+          '<button class="wt" data-open="'+i.id+'">'+esc(i.title)+'</button>'+
+          (locationLine(i)?'<span class="mono" style="font-size:11px;color:var(--muted)">'+esc(locationLine(i))+'</span>':"")+
+          catChip(i.category)+prioPill(i.priority)+statusPill(i.status)+
+          (w>=1?'<span class="carry">'+w+'w carried</span>':'<span class="tag">new</span>')+
+          avatarHTML(i.ownerId,"xs")+'</div>';
+      }).join("")+'</div>';
+  });
+  h += '<div class="toolbar" style="margin-top:12px"><button class="btn" data-act="copy-agenda">Copy agenda for the invite</button>'+
+       '<button class="btn" data-act="export-session">Export this review to Excel</button></div>';
+  return h;
+}
+
+function reviewRunHTML(s, agenda){
+  if(!agenda.length) return emptyState("Nothing to walk through","No open issues at the moment.","");
+  const done = Object.keys(s.outcomes||{}).length;
+  let h = '<div class="banner info"><strong>'+done+' of '+agenda.length+' decided.</strong>'+
+    '<span class="sp">Marking an item <em>Closed</em> closes the issue; <em>Deferred</em> leaves it open but off next week&rsquo;s priority list.</span></div>';
+  groupByAccount(agenda).forEach(([code,rows])=>{
+    h += '<div class="agenda-acct"><h4><span class="mono" style="color:var(--muted);font-size:11px">'+code+'</span>'+esc(acctName(code))+'</h4>'+
+      rows.map(i=>{
+        const o = (s.outcomes||{})[i.id];
+        const cls = o ? " done-"+o.o.charAt(0) : "";
+        const w = weeksCarried(i);
+        return '<div class="wrow'+cls+'">'+
+          '<span class="mono" style="font-size:11px;color:var(--muted);width:56px;flex:none">'+i.ref+'</span>'+
+          '<button class="wt" data-open="'+i.id+'">'+esc(i.title)+'</button>'+
+          prioPill(i.priority)+(w>=1?'<span class="carry">'+w+'w</span>':"")+avatarHTML(i.ownerId,"xs")+
+          '<span class="wactions">'+
+            [["closed","Closed"],["open","Still open"],["deferred","Defer"]].map(([v,n])=>
+              '<button class="wbtn" data-o="'+v+'" data-outcome="'+i.id+'" aria-pressed="'+(o&&o.o===v)+'">'+n+'</button>').join("")+
+          '</span>'+
+          '<input class="mini" style="flex:1;min-width:150px" placeholder="Note for the minutes" data-onote="'+i.id+'" value="'+esc(o&&o.note||"")+'">'+
+        '</div>';
+      }).join("")+'</div>';
+  });
+  return h;
+}
+
+function reviewSummaryHTML(s){
+  const outs = s.outcomes||{};
+  const ids = Object.keys(outs);
+  const wkStart = new Date(s.date+"T00:00:00"); const prevStart = addDays(wkStart,-7);
+  const raised = allIssues().filter(i=>i.createdAt>=prevStart.getTime() && i.createdAt<=new Date(s.date+"T23:59:59").getTime());
+  const closed = ids.filter(id=>outs[id].o==="closed");
+  const stillOpen = ids.filter(id=>outs[id].o==="open");
+  const deferred = ids.filter(id=>outs[id].o==="deferred");
+
+  const acctRows = {};
+  ids.forEach(id=>{ const i=state.issues[id]; if(!i) return;
+    const a=(acctRows[i.accountCode]=acctRows[i.accountCode]||{closed:0,open:0,deferred:0});
+    a[outs[id].o]++; });
+
+  let h = '<div class="grid-tiles">'+
+    '<div class="tile accent"><span class="v">'+raised.length+'</span><span class="l">Raised since last review</span></div>'+
+    '<div class="tile ok"><span class="v">'+closed.length+'</span><span class="l">Closed on this call</span></div>'+
+    '<div class="tile warn"><span class="v">'+stillOpen.length+'</span><span class="l">Carried to next week</span></div>'+
+    '<div class="tile"><span class="v">'+deferred.length+'</span><span class="l">Deferred</span></div>'+
+    '</div>';
+
+  h += '<div class="dash-grid">';
+  h += '<div class="card"><div class="card-head"><h3>Outcome by account</h3></div><div class="card-body" style="padding:6px 10px 12px">'+
+    (Object.keys(acctRows).length ? '<div class="tscroll"><table class="plain" style="min-width:330px"><thead><tr><th>Account</th><th>Closed</th><th>Carried</th><th>Deferred</th></tr></thead><tbody>'+
+      Object.entries(acctRows).sort((a,b)=>Number(a[0])-Number(b[0])).map(([code,r])=>
+        '<tr><td>'+esc(acctName(code))+' <span class="mono" style="color:var(--muted);font-size:11px">'+code+'</span></td>'+
+        '<td class="num" style="color:var(--ok)">'+r.closed+'</td><td class="num" style="color:var(--warn)">'+r.open+'</td>'+
+        '<td class="num">'+r.deferred+'</td></tr>').join("")+'</tbody></table></div>'
+      : '<p class="hint" style="padding:8px">No outcomes recorded yet — walk the agenda on the <strong>Run the call</strong> tab.</p>')+
+    '</div></div>';
+
+  const carriedList = stillOpen.map(id=>state.issues[id]).filter(Boolean).sort((a,b)=>weeksCarried(b)-weeksCarried(a));
+  h += '<div class="card"><div class="card-head"><h3>Longest-running carry-overs</h3></div><div class="card-body" style="padding:6px 10px 12px">'+
+    (carriedList.length ? '<div class="tscroll"><table class="plain" style="min-width:420px"><thead><tr><th>Ref</th><th>Issue</th><th>Account</th><th>Owner</th><th>Weeks</th></tr></thead><tbody>'+
+      carriedList.slice(0,10).map(i=>'<tr><td class="mono" style="font-size:11px">'+i.ref+'</td>'+
+        '<td><button class="t" data-open="'+i.id+'" style="border:0;background:none;padding:0;text-align:left;color:inherit;font-weight:500">'+esc(i.title)+'</button></td>'+
+        '<td style="font-size:12px">'+esc(acctName(i.accountCode))+'</td><td style="font-size:12px">'+esc(userName(i.ownerId))+'</td>'+
+        '<td class="num"'+(weeksCarried(i)>=3?' style="color:var(--crit);font-weight:600"':"")+'>'+weeksCarried(i)+'</td></tr>').join("")+'</tbody></table></div>'
+      : '<p class="hint" style="padding:8px">Nothing carried. Clean week.</p>')+
+    '</div></div>';
+  h += '</div>';
+
+  h += '<div class="card" style="margin-top:12px"><div class="card-head"><h3>Email summary</h3>'+
+    '<div style="margin-left:auto;display:flex;gap:7px">'+
+      '<button class="btn btn-sm" data-act="copy-summary">Copy to clipboard</button>'+
+      '<button class="btn btn-sm btn-primary" data-act="export-session">Export to Excel</button></div></div>'+
+    '<div class="card-body"><pre class="email" id="emailSummary">'+esc(emailSummaryText(s))+'</pre></div></div>';
+
+  h += '<div class="card" style="margin-top:12px"><div class="card-head"><h3>Minutes</h3></div><div class="card-body">'+
+    '<textarea class="notes" id="sessNotes" placeholder="Anything discussed that is not tied to a single issue — process changes, data-feed outages, actions for next week.">'+esc(s.notes||"")+'</textarea></div></div>';
+  return h;
+}
+
+function emailSummaryText(s){
+  const outs = s.outcomes||{}; const ids=Object.keys(outs);
+  const g = o => ids.map(id=>state.issues[id]).filter(i=>i&&outs[i.id].o===o);
+  const closed=g("closed"), open=g("open"), deferred=g("deferred");
+  const wkStart = addDays(new Date(s.date+"T00:00:00"),-7).getTime();
+  const raised = allIssues().filter(i=>i.createdAt>=wkStart && i.createdAt<=new Date(s.date+"T23:59:59").getTime());
+  const line = i => "  "+i.ref+"  "+i.title+"  ["+acctName(i.accountCode)+"] — "+userName(i.ownerId)+
+      (outs[i.id]&&outs[i.id].note?"  · "+outs[i.id].note:"")+
+      (outs[i.id]&&outs[i.id].o==="open"&&weeksCarried(i)>=1?"  · carried "+weeksCarried(i)+"w":"");
+  const L = [];
+  L.push(s.title.toUpperCase());
+  L.push("=".repeat(Math.min(64, s.title.length)));
+  L.push("");
+  L.push("Raised since last review: "+raised.length+"   Closed on the call: "+closed.length+
+         "   Carried: "+open.length+"   Deferred: "+deferred.length);
+  L.push("");
+  if(closed.length){ L.push("CLOSED"); closed.forEach(i=>L.push(line(i))); L.push(""); }
+  if(open.length){ L.push("CARRIED TO NEXT WEEK"); open.sort((a,b)=>weeksCarried(b)-weeksCarried(a)).forEach(i=>L.push(line(i))); L.push(""); }
+  if(deferred.length){ L.push("DEFERRED"); deferred.forEach(i=>L.push(line(i))); L.push(""); }
+  if(raised.length){ L.push("RAISED THIS WEEK"); raised.forEach(i=>L.push("  "+i.ref+"  "+i.title+"  ["+acctName(i.accountCode)+"] — "+(CAT[i.category]?CAT[i.category].name:"")+", "+PR[i.priority].name)); L.push(""); }
+  if(s.notes){ L.push("NOTES"); s.notes.split("\n").forEach(n=>L.push("  "+n)); L.push(""); }
+  L.push("Next review: "+fmtDateLong(iso(addDays(new Date(s.date+"T00:00:00"),7))));
+  return L.join("\n");
+}
+
+/* ============================================================
+   VIEW · SETUP
+   ============================================================ */
+function renderAdmin(){
+  const admin = isAdmin();
+  const meterCount = Object.keys(state.meters).length, siteCount = Object.keys(state.sites).length;
+  const unassigned = accountsSorted().filter(a=>!a.ownerId).length;
+  let h = "";
+  if(!admin) h += '<div class="banner info"><span class="sp">You are signed in as a team member. Only an administrator can change roles and account ownership.</span></div>';
+
+  /* ---------- People ---------- */
+  const people = '<div class="card"><div class="card-head"><h3>People</h3>'+
+    '<span class="eyebrow" style="margin-left:auto">'+usersSorted().length+'</span></div>'+
+    '<div class="tscroll"><table class="plain people-table"><thead><tr>'+
+      '<th>Name</th><th>Role</th><th title="Accounts owned">Owns</th><th></th></tr></thead><tbody>'+
+    usersSorted().map(u=>{
+      const owns = accountsSorted().filter(a=>a.ownerId===u.id).length;
+      const isMe = ME && u.id===ME.id;
+      return '<tr><td><span class="owner-cell">'+avatarHTML(u.id,"xs")+
+          (isMe
+            ? '<input class="cellsel" data-my-name value="'+esc(u.name)+'" aria-label="Your display name" style="font-weight:500">'
+            : '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(u.name)+'</span>')+
+          (isMe?'<span class="tag" style="flex:none">you</span>':"")+'</span>'+
+          '<span class="dh-site" title="'+esc(u.email||"")+'">'+esc(u.email||"")+'</span></td>'+
+        '<td>'+(admin && !isMe
+          ? '<select class="cellsel" data-user-role="'+u.id+'"><option value="member"'+(u.role==="member"?" selected":"")+'>Member</option>'+
+            '<option value="admin"'+(u.role==="admin"?" selected":"")+'>Administrator</option></select>'
+          : '<span style="font-size:12.5px">'+(u.role==="admin"?"Administrator":"Member")+'</span>')+'</td>'+
+        '<td class="num"'+(owns?'':' style="color:var(--muted)"')+'>'+owns+'</td>'+
+        '<td>'+(admin&&!isMe
+          ? '<button class="icon-btn" data-del-user="'+u.id+'" title="Remove '+esc(u.name)+'" style="width:24px;height:24px">'+
+            icon('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>')+'</button>' : "")+'</td></tr>';
+    }).join("")+'</tbody></table></div>'+
+    '<div class="card-body" style="border-top:1px solid var(--line)"><p class="hint" style="margin:0">'+
+      'People appear here the first time they sign in &mdash; there is nobody to invite and no account to create. '+
+      'Send them the link; anyone with an approved Savills address is let in, and everyone else is refused by the database. '+
+      'You can correct your own display name above.</p></div></div>';
+
+  /* ---------- Workspace ---------- */
+  const workspace = '<div class="card"><div class="card-head"><h3>Workspace</h3></div><div class="card-body">'+
+    '<table class="plain" style="font-size:12.5px"><tbody>'+
+      '<tr><td style="color:var(--muted);padding-left:0">Issues</td><td class="num" style="text-align:right;padding-right:0">'+allIssues().length+'</td></tr>'+
+      '<tr><td style="color:var(--muted);padding-left:0">Reviews</td><td class="num" style="text-align:right;padding-right:0">'+Object.keys(state.sessions).length+'</td></tr>'+
+      '<tr><td style="color:var(--muted);padding-left:0">Sites &amp; devices</td><td class="num" style="text-align:right;padding-right:0">'+siteCount+' &middot; '+meterCount+'</td></tr>'+
+      '<tr><td style="color:var(--muted);padding-left:0;border-bottom:0">Signed in as</td>'+
+        '<td style="text-align:right;padding-right:0;border-bottom:0;font-size:11.5px">'+esc(AUTH_EMAIL||"")+'</td></tr>'+
+    '</tbody></table>'+
+    '<div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">'+
+      '<button class="btn" data-act="export-all">Export everything to Excel</button>'+
+      '<button class="btn" data-act="export-workspace">Download a JSON backup</button>'+
+      (orphanCount()&&admin?'<button class="btn" data-act="prune-register">Clear '+orphanCount()+' unused register entries</button>':"")+
+    '</div>'+
+    '<p class="hint" style="margin:12px 0 0">Supabase backs the database up on its own schedule. These exports are for sharing, and for keeping a copy off the platform.</p>'+
+    '</div></div>';
+
+  /* ---------- Accounts ---------- */
+  const accounts = '<div class="card"><div class="card-head"><h3>Accounts &amp; owners</h3>'+
+    '<span class="eyebrow" style="margin-left:auto">'+accountsSorted().length+' accounts'+
+      (unassigned?' &middot; <span style="color:var(--warn)">'+unassigned+' unassigned</span>':"")+'</span></div>'+
+    '<div class="tscroll"><table class="plain acct-table"><thead><tr>'+
+      '<th>Code</th><th>Account</th><th>Owner</th><th title="Open issues">Open</th></tr></thead><tbody>'+
+    accountsSorted().map(a=>{
+      const n = openIssues().filter(i=>i.accountCode===a.code).length;
+      return '<tr><td class="mono" style="font-size:11.5px;color:var(--muted)">'+a.code+'</td>'+
+        '<td>'+esc(a.name)+'</td>'+
+        '<td>'+(admin
+          ? '<select class="cellsel" data-acct-owner="'+a.code+'"><option value="">Unassigned</option>'+
+            usersSorted().map(u=>'<option value="'+u.id+'"'+(a.ownerId===u.id?" selected":"")+'>'+esc(u.name)+'</option>').join("")+'</select>'
+          : '<span class="owner-cell">'+avatarHTML(a.ownerId,"xs")+'<span style="font-size:12.5px">'+esc(userName(a.ownerId))+'</span></span>')+'</td>'+
+        '<td class="num"'+(n?' style="font-weight:600"':' style="color:var(--muted)"')+'>'+n+'</td></tr>';
+    }).join("")+'</tbody></table></div></div>';
+
+  /* ---------- Device register ---------- */
+  const register = '<div class="card"><div class="card-head"><h3>Site &amp; device register</h3>'+
+    '<button class="btn btn-sm" style="margin-left:auto" data-act="add-devices">Register devices</button></div>'+
+    (meterCount
+      ? '<div class="tscroll capped"><table class="plain reg-table"><thead><tr><th>Account</th><th>Site</th><th>SavIQ Device Key</th><th title="Issues raised">Iss.</th></tr></thead><tbody>'+
+        Object.values(state.meters).sort((a,b)=>(a.accountCode+a.ref).localeCompare(b.accountCode+b.ref)).map(m=>{
+          const n = allIssues().filter(i=>i.meterId===m.id).length;
+          return '<tr><td style="font-size:12.5px">'+esc(acctName(m.accountCode))+'</td>'+
+            '<td style="font-size:12.5px">'+esc(siteName(m.siteId)||"—")+'</td>'+
+            '<td class="mono" style="font-size:12px">'+esc(m.ref)+'</td>'+
+            '<td class="num"'+(n>2?' style="color:var(--crit);font-weight:600" title="repeat offender"':"")+'>'+n+'</td></tr>';
+        }).join("")+'</tbody></table></div>'
+      : '<div class="card-body"><p class="hint" style="margin:0">No devices registered yet. Paste your SavIQ device keys in, or they appear automatically the first time someone types one on an issue.</p></div>')+
+    '</div>';
+
+  h += '<div class="admin-cols">'+
+        '<div class="admin-col">'+people+workspace+'</div>'+
+        '<div class="admin-col">'+accounts+register+'</div>'+
+       '</div>';
+
+  $("#pane-admin").innerHTML = h;
+}
+/* ============================================================
+   ISSUE DRAWER
+   ============================================================ */
+function openIssue(id){ ui.openIssueId=id; renderDrawer(); $("#drawer").classList.add("on"); $("#drawer").setAttribute("aria-hidden","false"); $("#scrim").classList.add("on"); }
+function closeDrawer(){ ui.openIssueId=null; $("#drawer").classList.remove("on"); $("#drawer").setAttribute("aria-hidden","true"); $("#scrim").classList.remove("on"); render(); }
+
+function renderDrawer(){
+  const i = state.issues[ui.openIssueId]; if(!i) return;
+  const sitesForAcct = Object.values(state.sites).filter(s=>s.accountCode===i.accountCode);
+  const metersForAcct = Object.values(state.meters).filter(m=>m.accountCode===i.accountCode);
+  const w = weeksCarried(i);
+
+  $("#drawer").innerHTML =
+    '<div class="dw-head">'+
+      '<span class="mono" style="font-size:12px;color:var(--muted)">'+i.ref+'</span>'+
+      statusPill(i.status)+
+      (i.status!=="closed"&&w>=1?'<span class="carry">carried '+w+'w</span>':"")+
+      '<span class="topbar-spacer"></span>'+
+      '<button class="btn btn-sm '+(i.status==="closed"?"":"btn-primary")+'" data-act="toggle-close">'+(i.status==="closed"?"Reopen":"Mark closed")+'</button>'+
+      '<button class="icon-btn" data-act="delete-issue" title="Delete issue">'+icon('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>')+'</button>'+
+      '<button class="icon-btn" data-act="close-drawer" title="Close">'+icon('<path d="M18 6L6 18M6 6l12 12"/>')+'</button>'+
+    '</div>'+
+    '<div class="dw-body">'+
+      '<textarea class="dw-title" id="dwTitle" rows="2" aria-label="Issue title">'+esc(i.title)+'</textarea>'+
+      '<div class="props">'+
+        '<label for="dwAcct">Account</label><select id="dwAcct" data-f="accountCode">'+
+          '<option value="">— pick an account —</option>'+
+          accountsSorted().map(a=>'<option value="'+a.code+'"'+(i.accountCode===a.code?" selected":"")+'>'+a.code+" · "+esc(a.name)+'</option>').join("")+'</select>'+
+        '<label for="dwSite">Site</label>'+
+          '<input id="dwSite" list="dwSiteList" data-f="siteName" placeholder="e.g. Block C — type to add" value="'+esc(siteName(i.siteId))+'">'+
+          '<datalist id="dwSiteList">'+sitesForAcct.map(s=>'<option value="'+esc(s.name)+'"></option>').join("")+'</datalist>'+
+        '<label for="dwMeter">SavIQ Device Key</label>'+
+          '<span class="stack">'+
+          '<select id="dwMeter" data-f="meterId"'+(i.accountCode?"":" disabled")+'>'+
+            '<option value="">'+(i.accountCode?"— none —":"— pick an account first —")+'</option>'+
+            metersForAcct.sort((a,b)=>a.ref.localeCompare(b.ref)).map(m=>
+              '<option value="'+m.id+'"'+(i.meterId===m.id?" selected":"")+'>'+esc(m.ref)+
+              (siteName(m.siteId)?"  ·  "+esc(siteName(m.siteId)):"")+'</option>').join("")+
+            (i.accountCode?'<option value="__new">+ Add a new device key…</option>':"")+
+          '</select>'+
+          '<input id="dwMeterNew" class="hide" placeholder="New device key, then press Enter">'+
+          '</span>'+
+        '<label for="dwCat">Issue type</label><select id="dwCat" data-f="category">'+
+          CATEGORIES.map(c=>'<option value="'+c.id+'"'+(i.category===c.id?" selected":"")+'>'+c.name+'</option>').join("")+'</select>'+
+        '<label for="dwPrio">Priority</label><select id="dwPrio" data-f="priority">'+
+          PRIORITIES.map(p=>'<option value="'+p.id+'"'+(i.priority===p.id?" selected":"")+'>'+p.name+'</option>').join("")+'</select>'+
+        '<label for="dwStatus">Status</label><select id="dwStatus" data-f="status">'+
+          STATUSES.map(s=>'<option value="'+s.id+'"'+(i.status===s.id?" selected":"")+'>'+s.name+'</option>').join("")+'</select>'+
+        '<label for="dwOwner">Owner</label><select id="dwOwner" data-f="ownerId">'+
+          '<option value="">Unassigned</option>'+usersSorted().map(u=>'<option value="'+u.id+'"'+(i.ownerId===u.id?" selected":"")+'>'+esc(u.name)+'</option>').join("")+'</select>'+
+        '<label for="dwRep">Raised by</label><select id="dwRep" data-f="reporterId">'+
+          '<option value="">—</option>'+usersSorted().map(u=>'<option value="'+u.id+'"'+(i.reporterId===u.id?" selected":"")+'>'+esc(u.name)+'</option>').join("")+'</select>'+
+        '<label for="dwStart">Start date</label><input id="dwStart" type="date" data-f="startDate" value="'+(i.startDate||"")+'">'+
+        '<label for="dwDue">Due date</label><input id="dwDue" type="date" data-f="dueDate" value="'+(i.dueDate||"")+'">'+
+        '<label for="dwRec">Repeats</label><select id="dwRec" data-f="recurrence">'+
+          RECURRENCE.map(r=>'<option value="'+r.id+'"'+(i.recurrence===r.id?" selected":"")+'>'+r.name+'</option>').join("")+'</select>'+
+        '<label for="dwTags">Tags</label><input id="dwTags" data-f="tags" placeholder="comma separated" value="'+esc((i.tags||[]).join(", "))+'">'+
+      '</div>'+
+      '<div class="dw-sec"><h4>Description</h4>'+
+        '<textarea class="notes" id="dwDesc" placeholder="What is wrong with the data, how it was spotted, and what good looks like.">'+esc(i.description||"")+'</textarea></div>'+
+      '<div class="dw-sec"><h4>Subtasks '+((i.subtasks||[]).length?'<span class="num" style="color:var(--muted)">'+(i.subtasks.filter(s=>s.done).length)+"/"+i.subtasks.length+'</span>':"")+'</h4>'+
+        (i.subtasks||[]).map(s=>'<div class="sub'+(s.done?" done":"")+'">'+
+          '<button class="tick" data-subtick="'+s.id+'" data-done="'+(s.done?1:0)+'" aria-label="Toggle subtask">'+icon('<path d="M20 6L9 17l-5-5"/>')+'</button>'+
+          '<input class="st" data-subtext="'+s.id+'" value="'+esc(s.text)+'">'+
+          '<button class="icon-btn" data-subdel="'+s.id+'" style="width:22px;height:22px" title="Remove">'+icon('<path d="M18 6L6 18M6 6l12 12"/>')+'</button></div>').join("")+
+        '<button class="ladd" data-act="add-subtask">+ Add subtask</button></div>'+
+      '<div class="dw-sec"><h4>Comments</h4>'+
+        ((i.comments||[]).length ? i.comments.map(c=>'<div class="cmt">'+avatarHTML(c.userId,"xs")+
+          '<span class="cb"><span class="ch"><span class="cn">'+esc(userName(c.userId))+'</span><span class="cd">'+fmtStamp(c.at)+'</span></span>'+
+          '<span class="ct">'+esc(c.text)+'</span></span></div>').join("") : '<p class="hint">No comments yet.</p>')+
+        '<div style="display:flex;gap:7px;margin-top:9px;align-items:flex-start">'+avatarHTML(ME?ME.id:null,"xs")+
+          '<textarea class="notes" id="dwComment" style="min-height:52px" placeholder="Add a comment&hellip;"></textarea></div>'+
+        '<div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn btn-sm btn-primary" data-act="add-comment">Comment</button></div></div>'+
+      '<div class="dw-sec"><h4>Activity</h4>'+
+        (i.activity||[]).slice().reverse().slice(0,40).map(a=>'<div class="act"><span class="ad">'+fmtStamp(a.at)+'</span>'+
+          '<span><strong>'+esc(userName(a.userId))+'</strong> '+esc(a.text)+'</span></div>').join("")+
+      '</div>'+
+    '</div>';
+}
+
+async function drawerField(el){
+  const i = state.issues[ui.openIssueId]; if(!i) return;
+  const f = el.dataset.f, v = el.value;
+  if(f==="siteName"){ const sid = await resolveSite(i.accountCode, v); return updateIssue(i.id,{siteId:sid}, v?("set site to "+v):"cleared the site"); }
+  if(f==="meterId"){
+    if(v==="__new"){ const box=$("#dwMeterNew"); box.classList.remove("hide"); box.value=""; box.focus(); return; }
+    return updateIssue(i.id,{meterId:v||null}, v?("set device key to "+meterRef(v)):"cleared the device key");
+  }
+  if(f==="tags"){ return updateIssue(i.id,{tags:v.split(",").map(t=>t.trim()).filter(Boolean)},"updated tags"); }
+  if(f==="status"){ return setStatus(i.id, v); }
+  if(f==="accountCode"){
+    const patch = {accountCode:v, siteId:null, meterId:null};
+    if(!i.ownerId) patch.ownerId = ownerFor(v);
+    return updateIssue(i.id, patch, "moved to account "+acctName(v));
+  }
+  const labels = {category:"issue type", priority:"priority", ownerId:"owner", reporterId:"reporter",
+                  startDate:"start date", dueDate:"due date", recurrence:"recurrence"};
+  const shown = (f==="ownerId"||f==="reporterId") ? userName(v) : (f==="category"?(CAT[v]||{}).name : (f==="priority"?PR[v].name : v||"none"));
+  return updateIssue(i.id, {[f]: v||null}, "changed "+(labels[f]||f)+" to "+shown);
+}
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+function closeModal(){ $("#modal").classList.remove("on"); $("#modal").innerHTML=""; }
+function showModal(html){ $("#modal").innerHTML = html; $("#modal").classList.add("on");
+  const f = $("#modal [data-autofocus]"); if(f) setTimeout(()=>f.focus(),30); }
+
+function quickAddModal(prefAcct){
+  const acct = prefAcct || ui.account || "";
+  showModal('<div class="sheet"><div class="sheet-head"><h3>Raise a QA issue</h3>'+
+    '<span class="topbar-spacer"></span><button class="icon-btn" data-act="close-modal">'+icon('<path d="M18 6L6 18M6 6l12 12"/>')+'</button></div>'+
+    '<div class="sheet-body"><div class="form-grid">'+
+      '<div class="fl full"><label for="qTitle">What is wrong?</label>'+
+        '<input id="qTitle" data-autofocus placeholder="e.g. No manual read submitted for September"></div>'+
+      '<div class="fl"><label for="qAcct">Account</label><select id="qAcct"><option value="">— pick —</option>'+
+        accountsSorted().map(a=>'<option value="'+a.code+'"'+(acct===a.code?" selected":"")+'>'+a.code+" · "+esc(a.name)+'</option>').join("")+'</select></div>'+
+      '<div class="fl"><label for="qCat">Issue type</label><select id="qCat">'+
+        CATEGORIES.map(c=>'<option value="'+c.id+'">'+c.name+'</option>').join("")+'</select></div>'+
+      '<div class="fl"><label for="qSite">Site <span style="font-weight:400">(optional)</span></label>'+
+        '<input id="qSite" list="qSiteList" placeholder="type to add"><datalist id="qSiteList">'+
+        Object.values(state.sites).map(s=>'<option value="'+esc(s.name)+'"></option>').join("")+'</datalist></div>'+
+      '<div class="fl"><label for="qMeter">SavIQ Device Key <span style="font-weight:400">(optional)</span></label>'+
+        '<select id="qMeter">'+deviceOptions(acct, "")+'</select>'+
+        '<input id="qMeterNew" class="hide" style="margin-top:5px" placeholder="New device key"></div>'+
+      '<div class="fl"><label for="qPrio">Priority</label><select id="qPrio">'+
+        PRIORITIES.map(p=>'<option value="'+p.id+'"'+(p.id==="medium"?" selected":"")+'>'+p.name+'</option>').join("")+'</select></div>'+
+      '<div class="fl"><label for="qDue">Due</label><input id="qDue" type="date" value="'+iso(addDays(mondayOf(new Date()),7))+'"></div>'+
+      '<div class="fl"><label for="qOwner">Owner</label><select id="qOwner"><option value="">Account owner</option>'+
+        usersSorted().map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join("")+'</select></div>'+
+      '<div class="fl"><label for="qRec">Repeats</label><select id="qRec">'+
+        RECURRENCE.map(r=>'<option value="'+r.id+'">'+r.name+'</option>').join("")+'</select></div>'+
+      '<div class="fl full"><label for="qDesc">Detail <span style="font-weight:400">(optional)</span></label>'+
+        '<textarea id="qDesc" rows="3" placeholder="How it was spotted, the period affected, what good looks like."></textarea></div>'+
+    '</div><p class="hint" style="margin:10px 0 0">Sites and meters you type here are added to the register automatically. '+
+      '<span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> saves and opens a fresh form.</p></div>'+
+    '<div class="sheet-foot"><button class="btn" data-act="close-modal">Cancel</button>'+
+      '<button class="btn" data-act="save-issue" data-again="1">Save &amp; add another</button>'+
+      '<button class="btn btn-primary" data-act="save-issue">Save issue</button></div></div>');
+}
+
+/* <option>s for the devices registered against one account */
+function deviceOptions(accountCode, selectedId){
+  if(!accountCode) return '<option value="">— pick an account first —</option>';
+  const list = Object.values(state.meters).filter(m=>m.accountCode===accountCode)
+                     .sort((a,b)=>a.ref.localeCompare(b.ref));
+  return '<option value="">— none —</option>'+
+    list.map(m=>'<option value="'+m.id+'"'+(selectedId===m.id?" selected":"")+'>'+esc(m.ref)+
+      (siteName(m.siteId)?"  ·  "+esc(siteName(m.siteId)):"")+'</option>').join("")+
+    '<option value="__new">+ Add a new device key…</option>';
+}
+
+async function saveQuickAdd(again){
+  const title = $("#qTitle").value.trim();
+  const accountCode = $("#qAcct").value;
+  if(!title){ toast("Give the issue a short title."); $("#qTitle").focus(); return; }
+  if(!accountCode){ toast("Pick the account the issue sits under."); $("#qAcct").focus(); return; }
+  const siteId = await resolveSite(accountCode, $("#qSite").value);
+  const pick = $("#qMeter").value;
+  const meterId = pick==="__new"
+    ? await resolveMeter(accountCode, siteId, $("#qMeterNew").value)
+    : (pick || null);
+  const issue = await createIssue({
+    title, accountCode, siteId, meterId,
+    category: $("#qCat").value, priority: $("#qPrio").value,
+    dueDate: $("#qDue").value || null, recurrence: $("#qRec").value,
+    ownerId: $("#qOwner").value || ownerFor(accountCode),
+    description: $("#qDesc").value.trim()
+  });
+  toast(issue.ref+" raised against "+acctName(accountCode));
+  if(again){ quickAddModal(accountCode); } else { closeModal(); openIssue(issue.id); }
+}
+
+function dayModal(ds){
+  const rows = visibleIssues().filter(i=>i.dueDate===ds).sort(sortByPriorityThenAge);
+  showModal('<div class="sheet"><div class="sheet-head"><h3>Due '+fmtDateLong(ds)+'</h3>'+
+    '<span class="topbar-spacer"></span><button class="icon-btn" data-act="close-modal">'+icon('<path d="M18 6L6 18M6 6l12 12"/>')+'</button></div>'+
+    '<div class="sheet-body">'+rows.map(i=>'<div class="mrow"><span class="mono" style="font-size:11px;color:var(--muted);width:56px;flex:none">'+i.ref+'</span>'+
+      '<button class="t" data-open="'+i.id+'">'+esc(i.title)+'</button>'+catChip(i.category)+prioPill(i.priority)+
+      '<span class="mono" style="font-size:11px;color:var(--muted)">'+esc(acctName(i.accountCode))+'</span></div>').join("")+'</div></div>');
+}
+/* ============================================================
+   EXCEL EXPORT
+   ============================================================ */
+function issueRow(i){
+  return {
+    Ref: i.ref, Issue: i.title,
+    "Account code": i.accountCode, Account: acctName(i.accountCode),
+    Site: siteName(i.siteId), "SavIQ Device Key": meterRef(i.meterId),
+    Type: (CAT[i.category]||{}).name || i.category,
+    Priority: (PR[i.priority]||{}).name || i.priority,
+    Status: (ST[i.status]||{}).name || i.status,
+    Owner: i.ownerId?userName(i.ownerId):"", "Raised by": i.reporterId?userName(i.reporterId):"",
+    "Raised on": new Date(i.createdAt).toISOString().slice(0,10),
+    "Start date": i.startDate||"", "Due date": i.dueDate||"",
+    "Closed on": i.closedAt ? new Date(i.closedAt).toISOString().slice(0,10) : "",
+    "Age (days)": ageDays(i), "Weeks carried": i.status==="closed"?0:weeksCarried(i),
+    Repeats: (RECURRENCE.find(r=>r.id===i.recurrence)||{}).name||"",
+    Tags: (i.tags||[]).join(", "),
+    Subtasks: (i.subtasks||[]).length ? (i.subtasks.filter(s=>s.done).length+"/"+i.subtasks.length) : "",
+    Comments: (i.comments||[]).length,
+    Detail: i.description||""
+  };
+}
+function autoWidth(rows){
+  if(!rows.length) return [];
+  return Object.keys(rows[0]).map(k=>({wch: Math.min(48, Math.max(k.length+2, ...rows.map(r=>String(r[k]??"").length+2)))}));
+}
+function addSheet(wb, name, rows){
+  const ws = XLSX.utils.json_to_sheet(rows.length?rows:[{"":""}]);
+  ws["!cols"] = autoWidth(rows);
+  if(rows.length) ws["!autofilter"] = {ref: ws["!ref"]};
+  XLSX.utils.book_append_sheet(wb, ws, name.slice(0,31));
+}
+
+function workbookAll(){
+  const wb = XLSX.utils.book_new();
+  addSheet(wb, "Issues", allIssues().sort((a,b)=>a.ref.localeCompare(b.ref)).map(issueRow));
+  addSheet(wb, "Accounts", accountsSorted().map(a=>({
+    Code:a.code, Account:a.name, Owner:a.ownerId?userName(a.ownerId):"Unassigned",
+    Open: openIssues().filter(i=>i.accountCode===a.code).length,
+    Total: allIssues().filter(i=>i.accountCode===a.code).length
+  })));
+  addSheet(wb, "People", usersSorted().map(u=>({
+    Name:u.name, Role:u.role==="admin"?"Administrator":"Member",
+    "Accounts owned": accountsSorted().filter(a=>a.ownerId===u.id).map(a=>a.name).join(", "),
+    "Open issues owned": openIssues().filter(i=>i.ownerId===u.id).length
+  })));
+  addSheet(wb, "Device register", Object.values(state.meters).map(m=>({
+    "Account code":m.accountCode, Account:acctName(m.accountCode), Site:siteName(m.siteId),
+    "SavIQ Device Key":m.ref, Issues: allIssues().filter(i=>i.meterId===m.id).length
+  })));
+  const rev = [];
+  sessionsSorted().forEach(s=>{
+    Object.entries(s.outcomes||{}).forEach(([id,o])=>{
+      const i = state.issues[id]; if(!i) return;
+      rev.push({Review:s.title, "Review date":s.date, Ref:i.ref, Issue:i.title,
+        Account:acctName(i.accountCode),
+        Outcome:{closed:"Closed", open:"Carried", deferred:"Deferred"}[o.o]||o.o,
+        Note:o.note||"", Owner:i.ownerId?userName(i.ownerId):""});
+    });
+  });
+  addSheet(wb, "Review outcomes", rev);
+  addSheet(wb, "Comments", allIssues().flatMap(i=>(i.comments||[]).map(c=>({
+    Ref:i.ref, Issue:i.title, Author:userName(c.userId),
+    When:new Date(c.at).toISOString().slice(0,16).replace("T"," "), Comment:c.text
+  }))));
+  return wb;
+}
+
+function workbookSession(s){
+  const wb = XLSX.utils.book_new();
+  const outs = s.outcomes||{};
+  const rows = Object.keys(outs).map(id=>{
+    const i = state.issues[id]; if(!i) return null;
+    return Object.assign({Outcome:{closed:"Closed",open:"Carried",deferred:"Deferred"}[outs[id].o],
+                          "Minute note":outs[id].note||""}, issueRow(i));
+  }).filter(Boolean);
+  const counts = {closed:0, open:0, deferred:0};
+  Object.values(outs).forEach(o=>counts[o.o]++);
+  const wkStart = addDays(new Date(s.date+"T00:00:00"),-7).getTime();
+  const raised = allIssues().filter(i=>i.createdAt>=wkStart && i.createdAt<=new Date(s.date+"T23:59:59").getTime());
+  addSheet(wb, "Summary", [
+    {Metric:"Review", Value:s.title},
+    {Metric:"Date", Value:s.date},
+    {Metric:"Raised since last review", Value:raised.length},
+    {Metric:"Closed on the call", Value:counts.closed},
+    {Metric:"Carried to next week", Value:counts.open},
+    {Metric:"Deferred", Value:counts.deferred},
+    {Metric:"Minutes", Value:s.notes||""}
+  ]);
+  addSheet(wb, "Outcomes", rows);
+  addSheet(wb, "Raised this week", raised.map(issueRow));
+  return wb;
+}
+
+async function downloadWorkbook(wb, filename){
+  let data;
+  try{ data = XLSX.write(wb, {bookType:"xlsx", type:"array"}); }
+  catch(e){ toast("Could not build the workbook."); return; }
+  const blob = new Blob([data], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  toast("Saved "+filename);
+}
+
+function copyText(text, what){
+  const done = ()=>toast(what+" copied to the clipboard");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallback());
+  } else fallback();
+  function fallback(){
+    const ta=document.createElement("textarea"); ta.value=text;
+    ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand("copy"); done(); }catch(e){ toast("Select the text and copy it manually."); }
+    ta.remove();
+  }
+}
+
+function agendaText(s){
+  const rows = sessionAgenda(s);
+  const L = ["AGENDA — "+s.title, ""];
+  groupByAccount(rows).forEach(([code,items])=>{
+    L.push(acctName(code)+" ("+code+") — owner: "+userName((state.accounts[code]||{}).ownerId));
+    items.forEach(i=>{
+      const w = weeksCarried(i);
+      L.push("   "+i.ref+"  "+i.title+"  ["+(CAT[i.category]||{}).name+", "+PR[i.priority].name+"]"+
+             (w>=1?"  · carried "+w+"w":"  · new")+(locationLine(i)?"  · "+locationLine(i):""));
+    });
+    L.push("");
+  });
+  L.push(rows.length+" items · "+groupByAccount(rows).length+" accounts");
+  return L.join("\n");
+}
+
+
+/* ============================================================
+   JSON BACKUP — a portable copy of everything, off-platform
+   ============================================================ */
+function saveBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  toast("Saved "+filename);
+}
+
+function exportWorkspace(){
+  const snap = {
+    format:"meterqa.workspace", schema:2,
+    exportedAt:new Date().toISOString(), exportedBy: ME?ME.name:null,
+    counts:{ users:Object.keys(state.users).length, accounts:Object.keys(state.accounts).length,
+             sites:Object.keys(state.sites).length, devices:Object.keys(state.meters).length,
+             issues:Object.keys(state.issues).length, sessions:Object.keys(state.sessions).length },
+    data:{ users:state.users, accounts:state.accounts, sites:state.sites,
+           devices:state.meters, issues:state.issues, sessions:state.sessions }
+  };
+  saveBlob(new Blob([JSON.stringify(snap, null, 2)], {type:"application/json"}),
+           "meter-qa-backup "+todayISO()+".json");
+}
+/* ============================================================
+   EVENT WIRING
+   ============================================================ */
+let renderQueued = false;
+function isEditing(){
+  const a = document.activeElement;
+  return a && (a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT") && a.closest("#viewport, #drawer, #modal");
+}
+function safeRender(){ if(isEditing()){ renderQueued = true; return; } render(); }
+document.addEventListener("focusout", ()=>{ setTimeout(()=>{ if(renderQueued && !isEditing()){ renderQueued=false; render(); } }, 60); });
+
+document.addEventListener("click", async e=>{
+  const t = e.target.closest("[data-view],[data-acct],[data-open],[data-act],[data-tick],[data-collapse],[data-scope],[data-toggle],[data-cat],[data-quick-acct],[data-cal],[data-cal-day],[data-tlw],[data-dhw],[data-dhh],[data-session],[data-stab],[data-outcome],[data-del-user],[data-subtick],[data-subdel],[data-acct-jump],[data-view-jump]");
+  if(!t) return;
+  const d = t.dataset;
+
+  if(d.view){ setView(d.view); return; }
+  if(d.viewJump){ setView(d.viewJump); return; }
+  if(d.acct){ ui.account = ui.account===d.acct ? null : d.acct; if(ui.view==="admin"||ui.view==="review") setView("list"); else render(); return; }
+  if(d.acctJump){ ui.account = d.acctJump; setView("list"); return; }
+  if(d.open){ closeModal(); openIssue(d.open); return; }
+  if(d.collapse){ const k=d.collapse; ui.collapsed.has(k)?ui.collapsed.delete(k):ui.collapsed.add(k); render(); return; }
+  if(d.scope){ ui.mineOnly = d.scope==="mine"; render(); return; }
+  if(d.toggle==="closed"){ ui.showClosed=!ui.showClosed; render(); return; }
+  if(d.cat){ ui.cats.has(d.cat)?ui.cats.delete(d.cat):ui.cats.add(d.cat); render(); return; }
+  if(d.quickAcct){ quickAddModal(d.quickAcct); return; }
+  if(d.tick){ const i=state.issues[d.tick]; if(i) await setStatus(i.id, i.status==="closed"?"open":"closed"); return; }
+  if(d.cal!==undefined && d.cal!==""){
+    if(d.cal==="0"){ const n=new Date(); ui.calMonth=new Date(n.getFullYear(),n.getMonth(),1); }
+    else ui.calMonth = new Date(ui.calMonth.getFullYear(), ui.calMonth.getMonth()+Number(d.cal), 1);
+    render(); return;
+  }
+  if(d.calDay){ dayModal(d.calDay); return; }
+  if(d.tlw){ ui.tlWeeks = Number(d.tlw); render(); return; }
+  if(d.dhw){ ui.dhWeeks = Number(d.dhw); render(); return; }
+  if(d.dhh){ ui.dhHealth = ui.dhHealth===d.dhh ? null : d.dhh; render(); return; }
+  if(d.session){ ui.sessionId=d.session; ui.sessionTab= state.sessions[d.session].status==="complete"?"summary":"run"; render(); return; }
+  if(d.stab){ ui.sessionTab=d.stab; render(); return; }
+  if(d.outcome){ await setOutcome(ui.sessionId, d.outcome, d.o); return; }
+  if(d.signin){ setMe(d.signin); closeModal(); render(); return; }
+  if(d.delUser){
+    const u = state.users[d.delUser]; if(!u) return;
+    if(!confirm("Remove "+u.name+" from the workspace? Their issues and comments stay, but any account they own becomes unassigned. If they sign in again they will be added back as a member.")) return;
+    await removeUser(u.id); toast(u.name+" removed"); return;
+  }
+  if(d.subtick||d.subdel){
+    const i = state.issues[ui.openIssueId]; if(!i) return;
+    let subs = (i.subtasks||[]).slice();
+    if(d.subdel) subs = subs.filter(s=>s.id!==d.subdel);
+    else subs = subs.map(s=>s.id===d.subtick?Object.assign({},s,{done:!s.done}):s);
+    await updateIssue(i.id, {subtasks:subs}); return;
+  }
+
+  switch(d.act){
+    case "new-issue": quickAddModal(); break;
+    case "add-devices": addDevicesModal(); break;
+    case "save-devices": await saveDevices(); break;
+    case "dh-clear": ui.dhHealth = null; render(); break;
+    case "close-modal": closeModal(); break;
+    case "save-issue": await saveQuickAdd(!!d.again); break;
+    case "close-drawer": closeDrawer(); break;
+    case "toggle-close": { const i=state.issues[ui.openIssueId]; if(i) await setStatus(i.id, i.status==="closed"?"open":"closed"); break; }
+    case "delete-issue": {
+      const i=state.issues[ui.openIssueId]; if(!i) break;
+      if(!isAdmin()){ toast("Only an administrator can delete an issue. Close it instead."); break; }
+      if(!confirm("Delete "+i.ref+" permanently? This cannot be undone.")) break;
+      await deleteIssue(i.id); closeDrawer(); toast(i.ref+" deleted"); break;
+    }
+    case "add-subtask": {
+      const i=state.issues[ui.openIssueId]; if(!i) break;
+      await updateIssue(i.id, {subtasks:(i.subtasks||[]).concat([{id:uid("s"), text:"New subtask", done:false}])});
+      setTimeout(()=>{ const inputs=$$("#drawer [data-subtext]"); const last=inputs[inputs.length-1]; if(last){ last.focus(); last.select(); } },40);
+      break;
+    }
+    case "add-comment": {
+      const box = $("#dwComment"); const txt = box ? box.value.trim() : "";
+      if(!txt){ toast("Type a comment first."); break; }
+      box.value = "";
+      await addComment(ui.openIssueId, txt);
+      renderDrawer(); break;
+    }
+    case "new-session": await createSession(); render(); break;
+    case "back-sessions": ui.sessionId=null; render(); break;
+    case "complete-session": {
+      await updateSession(ui.sessionId, {status:"complete", completedAt:Date.now()});
+      ui.sessionTab="summary"; toast("Review closed out"); break;
+    }
+    case "reopen-session":
+      await updateSession(ui.sessionId, {status:"live", completedAt:null}); break;
+    case "copy-agenda": copyText(agendaText(state.sessions[ui.sessionId]), "Agenda"); break;
+    case "copy-summary": copyText(emailSummaryText(state.sessions[ui.sessionId]), "Summary"); break;
+    case "export-session": await downloadWorkbook(workbookSession(state.sessions[ui.sessionId]),
+        "QA review "+state.sessions[ui.sessionId].date+".xlsx"); break;
+    case "export-all": await downloadWorkbook(workbookAll(), "Meter QA log "+todayISO()+".xlsx"); break;
+    case "clear-filters": ui.cats.clear(); ui.q=""; ui.account=null; ui.mineOnly=false; $("#searchInput").value=""; render(); break;
+  }
+});
+
+document.addEventListener("change", async e=>{
+  const el = e.target, d = el.dataset;
+  if(d.f && el.closest("#drawer")) return drawerField(el);
+  if(d.setStatus) return setStatus(d.setStatus, el.value);
+  if(d.setPrio) return updateIssue(d.setPrio, {priority:el.value}, "changed priority to "+PR[el.value].name);
+  if(d.userRole) return setUserRole(d.userRole, el.value);
+  if(d.acctOwner) return setAccountOwner(d.acctOwner, el.value||null);
+  if("myName" in d) return setUserName(ME.id, el.value.trim()||ME.name);
+  if(d.onote) return setOutcomeNote(ui.sessionId, d.onote, el.value);
+  if(d.subtext){
+    const i=state.issues[ui.openIssueId]; if(!i) return;
+    return updateIssue(i.id, {subtasks:(i.subtasks||[]).map(s=>s.id===d.subtext?Object.assign({},s,{text:el.value}):s)});
+  }
+  if(el.id==="qAcct"){
+    const sel = $("#qMeter"); if(sel) sel.innerHTML = deviceOptions(el.value, "");
+    const box = $("#qMeterNew"); if(box){ box.classList.add("hide"); box.value=""; }
+    return;
+  }
+  if(el.id==="qMeter"){
+    const box = $("#qMeterNew"); if(!box) return;
+    const add = el.value==="__new";
+    box.classList.toggle("hide", !add);
+    if(add){ box.value=""; box.focus(); }
+    return;
+  }
+  if(el.id==="groupBy"){ ui.group=el.value; render(); }
+  if(el.id==="sessNotes") return updateSession(ui.sessionId, {notes:el.value});
+  if(el.id==="dwTitle"||el.id==="dwDesc"){
+    const i=state.issues[ui.openIssueId]; if(!i) return;
+    const f = el.id==="dwTitle" ? "title" : "description";
+    const v = el.value.trim() || (f==="title"?"Untitled issue":"");
+    if(v!==i[f]) return updateIssue(i.id, {[f]:v}, f==="title"?"renamed the issue":"updated the description");
+  }
+});
+
+let searchT;
+$("#searchInput").addEventListener("input", e=>{
+  clearTimeout(searchT);
+  searchT = setTimeout(()=>{ ui.q = e.target.value.trim(); if(ui.q && ui.view==="dashboard") setView("list"); else render(); }, 220);
+});
+
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape"){
+    if($("#modal").classList.contains("on")) return closeModal();
+    if($("#drawer").classList.contains("on")) return closeDrawer();
+  }
+  if((e.ctrlKey||e.metaKey) && e.key==="Enter" && $("#modal").classList.contains("on") && $("#qTitle")){
+    e.preventDefault(); saveQuickAdd(true); return;
+  }
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if(typing) return;
+  if(e.key==="n"||e.key==="N"){ e.preventDefault(); quickAddModal(); }
+  if(e.key==="/"){ e.preventDefault(); $("#searchInput").focus(); }
+});
+
+/* "+ Add a new device key" box in the issue drawer */
+document.addEventListener("keydown", async e=>{
+  if(e.key!=="Enter" || e.target.id!=="dwMeterNew") return;
+  e.preventDefault();
+  const i = state.issues[ui.openIssueId]; if(!i) return;
+  const ref = e.target.value.trim();
+  if(!ref){ e.target.classList.add("hide"); renderDrawer(); return; }
+  const mid = await resolveMeter(i.accountCode, i.siteId, ref);
+  await updateIssue(i.id, {meterId:mid}, "set device key to "+ref);
+  toast(ref+" registered");
+});
+
+$("#scrim").addEventListener("click", closeDrawer);
+$("#modal").addEventListener("click", e=>{ if(e.target.id==="modal") closeModal(); });
+$("#newIssueBtn").addEventListener("click", ()=>quickAddModal());
+$("#exportBtn").addEventListener("click", ()=>downloadWorkbook(workbookAll(), "Meter QA log "+todayISO()+".xlsx"));
+$("#signOut").addEventListener("click", ()=>{ if(confirm("Sign out of Meter QA Review?")) signOut(); });
+$("#acctFilterClear").addEventListener("click", ()=>{ ui.account=null; render(); });
+$("#railToggle").addEventListener("click", ()=>{ $("#rail").classList.toggle("on"); $("#railBackdrop").classList.toggle("on"); });
+$("#railBackdrop").addEventListener("click", ()=>{ $("#rail").classList.remove("on"); $("#railBackdrop").classList.remove("on"); });
+$("#themeToggle").addEventListener("click", ()=>{
+  const cur = document.documentElement.getAttribute("data-theme");
+  const dark = cur ? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = dark ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  try{ localStorage.setItem("meterqa.theme", next); }catch(x){}
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+try{ const th=localStorage.getItem("meterqa.theme"); if(th) document.documentElement.setAttribute("data-theme", th); }catch(e){}
+
+/* sign-in screen buttons live outside the delegated app handler */
+document.addEventListener("click", e=>{
+  if(e.target.closest("#gateSend")) return sendMagicLink();
+  if(e.target.closest("#gateBack")) return signInScreen();
+  if(e.target.closest("#gateOut"))  return signOut();
+});
+document.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && e.target.id==="gateEmail"){ e.preventDefault(); sendMagicLink(); }
+});
+
+Store.onChange(safeRender);
+window.addEventListener("online",  ()=>setOnline(true));
+window.addEventListener("offline", ()=>setOnline(false));
+
+boot().catch(err=>{
+  console.error(err);
+  gate('<h2>Could not start</h2><p>'+esc(err && err.message || String(err))+'</p>'+
+       '<p class="gate-note">If this persists, check that <code>config.js</code> has the right Project URL and anon key.</p>');
+});
+</script>
+</body>
+</html>

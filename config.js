@@ -1,0 +1,18 @@
+/* ---------------------------------------------------------------------------
+   Supabase connection details.
+
+   Get both from your Supabase project: Project Settings -> API.
+   Replace the two placeholder strings below and save.
+
+   The anon key is MEANT to be public. It ships in the page and lives in the
+   repo, and that is fine — it identifies the project, it does not grant
+   access. What protects the data is the row-level security in
+   supabase/schema.sql, which only lets approved Savills addresses read or
+   write anything.
+
+   NEVER paste the service_role key here. That one bypasses every rule.
+   --------------------------------------------------------------------------- */
+window.QA_CONFIG = {
+  SUPABASE_URL: "https://abcdefgh.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOi...replace-me"
+};
