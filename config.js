@@ -13,6 +13,6 @@
    NEVER paste the service_role key here. That one bypasses every rule.
    --------------------------------------------------------------------------- */
 window.QA_CONFIG = {
-  SUPABASE_URL: "https://abcdefgh.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOi...replace-me"
+  SUPABASE_URL: "https://bqlvtzjksuvgtlvrstmc.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_1-R8Ox8fElKf7MgHZj8Jcw_bD5JcBP_"
 };
