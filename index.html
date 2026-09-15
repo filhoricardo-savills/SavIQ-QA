@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <style>
 
@@ -813,13 +813,15 @@ function renderDrawerIfIdle(){
 function gate(html){ $("#gate").classList.add("on"); $("#gateBody").innerHTML = html; $("#bootMsg").classList.add("hide"); }
 function ungate(){ $("#gate").classList.remove("on"); $("#bootMsg").classList.add("hide"); }
 
+let PENDING_EMAIL = null;
+
 function signInScreen(msg){
   gate(
     '<h2>Sign in</h2>'+
-    '<p>Enter your Savills email address and we&rsquo;ll send you a sign-in link. No password to remember.</p>'+
+    '<p>Enter your Savills email address and we&rsquo;ll send you a 6-digit code.</p>'+
     '<label for="gateEmail">Work email</label>'+
     '<input id="gateEmail" type="email" autocomplete="email" inputmode="email" placeholder="name@savills.ie">'+
-    '<button class="btn btn-primary" id="gateSend">Email me a sign-in link</button>'+
+    '<button class="btn btn-primary" id="gateSend">Email me a code</button>'+
     (msg||"")+
     '<p class="gate-note">Only Savills addresses can open this workspace. '+
     'If you sign in with anything else you will get in, but every page will be empty &mdash; '+
@@ -827,27 +829,52 @@ function signInScreen(msg){
   setTimeout(()=>{ const el=$("#gateEmail"); if(el) el.focus(); }, 40);
 }
 
-async function sendMagicLink(){
+/* A 6-digit code rather than a clickable link, deliberately: corporate mail
+   scanners (Defender Safe Links and friends) pre-fetch every URL in a message,
+   which spends a single-use sign-in link before the recipient ever clicks it.
+   There is nothing in a code for a scanner to consume. */
+async function sendCode(){
   const email = ($("#gateEmail").value||"").trim().toLowerCase();
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
-    $("#gateSend").insertAdjacentHTML("afterend",
-      '<div class="gate-msg err">That does not look like an email address.</div>');
+    signInScreen('<div class="gate-msg err">That does not look like an email address.</div>');
     return;
   }
   const btn = $("#gateSend"); btn.disabled = true; btn.textContent = "Sending…";
-  const {error} = await sb.auth.signInWithOtp({
-    email, options:{ emailRedirectTo: window.location.href.split("#")[0] }
-  });
+  const {error} = await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:true } });
   if(error){
-    btn.disabled = false; btn.textContent = "Email me a sign-in link";
-    gate($("#gateBody").innerHTML);
     signInScreen('<div class="gate-msg err">'+esc(error.message)+'</div>');
+    const el=$("#gateEmail"); if(el) el.value = email;
     return;
   }
+  PENDING_EMAIL = email;
+  codeScreen();
+}
+
+function codeScreen(msg){
   gate('<h2>Check your inbox</h2>'+
-    '<p>We sent a sign-in link to <strong>'+esc(email)+'</strong>. Open it on this device and you are in.</p>'+
-    '<p class="gate-note">Nothing arrived? Give it a minute, then look in Junk &mdash; automated mail from new senders often lands there the first time. '+
-    '<button class="btn btn-sm" id="gateBack" style="width:auto;margin-top:10px">Try a different address</button></p>');
+    '<p>We sent a 6-digit code to <strong>'+esc(PENDING_EMAIL)+'</strong>. Enter it below.</p>'+
+    '<label for="gateCode">Sign-in code</label>'+
+    '<input id="gateCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" '+
+      'placeholder="000000" style="font-family:var(--mono);font-size:22px;letter-spacing:8px;text-align:center">'+
+    '<button class="btn btn-primary" id="gateVerify">Sign in</button>'+
+    (msg||"")+
+    '<p class="gate-note">The code lasts about an hour. Nothing arrived? Look in Junk &mdash; '+
+    'mail from a new sender often lands there the first time. '+
+    '<button class="btn btn-sm" id="gateBack" style="width:auto;margin-top:10px">Use a different address</button></p>');
+  setTimeout(()=>{ const el=$("#gateCode"); if(el) el.focus(); }, 40);
+}
+
+async function verifyCode(){
+  const token = ($("#gateCode").value||"").replace(/\D/g,"");
+  if(token.length<6){ codeScreen('<div class="gate-msg err">Enter all six digits.</div>'); return; }
+  const btn = $("#gateVerify"); btn.disabled = true; btn.textContent = "Checking…";
+  const {data, error} = await sb.auth.verifyOtp({ email:PENDING_EMAIL, token, type:"email" });
+  if(error || !data || !data.user){
+    codeScreen('<div class="gate-msg err">'+esc(error?error.message:"That code was not accepted.")+
+      ' Codes can only be used once &mdash; request a new one if you have already tried it.</div>');
+    return;
+  }
+  await start(data.user);
 }
 
 async function signOut(){
@@ -2729,12 +2756,14 @@ try{ const th=localStorage.getItem("meterqa.theme"); if(th) document.documentEle
 
 /* sign-in screen buttons live outside the delegated app handler */
 document.addEventListener("click", e=>{
-  if(e.target.closest("#gateSend")) return sendMagicLink();
+  if(e.target.closest("#gateSend"))   return sendCode();
+  if(e.target.closest("#gateVerify")) return verifyCode();
   if(e.target.closest("#gateBack")) return signInScreen();
   if(e.target.closest("#gateOut"))  return signOut();
 });
 document.addEventListener("keydown", e=>{
-  if(e.key==="Enter" && e.target.id==="gateEmail"){ e.preventDefault(); sendMagicLink(); }
+  if(e.key==="Enter" && e.target.id==="gateEmail"){ e.preventDefault(); sendCode(); }
+  if(e.key==="Enter" && e.target.id==="gateCode"){ e.preventDefault(); verifyCode(); }
 });
 
 Store.onChange(safeRender);
