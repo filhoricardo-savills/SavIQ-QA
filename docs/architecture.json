@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SavIQ Meter QA Review",
+    "subtitle": "Static page, hosted data — how the weekly QA tracker actually runs",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "visual_preset": "signal-flow",
+    "repository": {
+      "url": "https://github.com/filhoricardo-savills/SavIQ-QA",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "f5f63080640666dd1dc2e950ee3c1d9092d30913"
+    },
+    "views": [
+      {
+        "id": "deploy-path",
+        "label": "How code reaches the team",
+        "focus": [
+          "github",
+          "vercel",
+          "browser"
+        ],
+        "note": "A push to main is the whole deployment. There is no build step and no server to restart."
+      },
+      {
+        "id": "sign-in",
+        "label": "Who gets in",
+        "focus": [
+          "team",
+          "browser",
+          "auth",
+          "rls"
+        ],
+        "note": "Email and password, then every single row is re-checked against the Savills domain in Postgres."
+      },
+      {
+        "id": "data-path",
+        "label": "Where the data lives",
+        "focus": [
+          "browser",
+          "postgres",
+          "realtime",
+          "rls"
+        ],
+        "note": "The browser talks straight to Postgres over HTTPS. Nothing of ours runs server-side."
+      }
+    ],
+    "viewBox": [
+      1000,
+      620
+    ]
+  },
+  "components": [
+    {
+      "id": "github",
+      "type": "cloud",
+      "label": "GitHub",
+      "sublabel": "filhoricardo-savills/SavIQ-QA",
+      "tag": "Savills org",
+      "brand": "github",
+      "pos": [
+        40,
+        70
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "index.html",
+          "label": "the whole app"
+        }
+      ]
+    },
+    {
+      "id": "vercel",
+      "type": "cloud",
+      "label": "Vercel",
+      "sublabel": "static hosting + CDN",
+      "tag": "auto-deploy on push",
+      "brand": "vercel",
+      "pos": [
+        258,
+        70
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "team",
+      "type": "external",
+      "label": "QA team",
+      "sublabel": "5 people, @savills.ie",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Meter QA Review",
+      "sublabel": "one HTML file, no framework",
+      "tag": "runs in the browser",
+      "pos": [
+        258,
+        240
+      ],
+      "size": [
+        160,
+        80
+      ],
+      "sources": [
+        {
+          "path": "index.html",
+          "label": "app + views + state"
+        }
+      ]
+    },
+    {
+      "id": "cdn",
+      "type": "external",
+      "label": "jsDelivr",
+      "sublabel": "supabase-js, SheetJS",
+      "pos": [
+        40,
+        380
+      ],
+      "size": [
+        150,
+        56
+      ]
+    },
+    {
+      "id": "excel",
+      "type": "external",
+      "label": "Excel export",
+      "sublabel": "built client-side",
+      "tag": "never touches a server",
+      "pos": [
+        258,
+        470
+      ],
+      "size": [
+        150,
+        56
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Supabase Auth",
+      "sublabel": "email + password",
+      "tag": "issues the JWT",
+      "brand": "supabase",
+      "pos": [
+        504,
+        120
+      ],
+      "size": [
+        156,
+        64
+      ]
+    },
+    {
+      "id": "rls",
+      "type": "security",
+      "label": "Row Level Security",
+      "sublabel": "is_team() on every row",
+      "tag": "@savills.ie only",
+      "pos": [
+        504,
+        250
+      ],
+      "size": [
+        156,
+        64
+      ],
+      "sources": [
+        {
+          "path": "supabase/schema.sql",
+          "label": "policies"
+        }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "9 tables · EU region",
+      "tag": "issues, reviews, devices",
+      "brand": "supabase",
+      "pos": [
+        750,
+        250
+      ],
+      "size": [
+        156,
+        64
+      ],
+      "sources": [
+        {
+          "path": "supabase/schema.sql",
+          "label": "schema"
+        }
+      ]
+    },
+    {
+      "id": "realtime",
+      "type": "messagebus",
+      "label": "Realtime",
+      "sublabel": "Postgres replication",
+      "tag": "live for everyone",
+      "pos": [
+        750,
+        410
+      ],
+      "size": [
+        156,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Supabase project · EU region",
+      "wraps": [
+        "auth",
+        "rls",
+        "postgres",
+        "realtime"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Nothing crosses this without a verified Savills address",
+      "wraps": [
+        "rls",
+        "postgres"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "push-deploys",
+      "from": "github",
+      "to": "vercel",
+      "label": "push to main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "serves-page",
+      "from": "vercel",
+      "to": "browser",
+      "label": "serves the page",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 58
+    },
+    {
+      "id": "team-opens",
+      "from": "team",
+      "to": "browser",
+      "label": "opens",
+      "variant": "emphasis"
+    },
+    {
+      "id": "libs",
+      "from": "cdn",
+      "to": "browser",
+      "label": "libraries",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "labelAt": [
+        242,
+        398
+      ]
+    },
+    {
+      "id": "exports",
+      "from": "browser",
+      "to": "excel",
+      "label": "download",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        368,
+        436
+      ]
+    },
+    {
+      "id": "sign-in",
+      "from": "browser",
+      "to": "auth",
+      "label": "sign in",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "jwt",
+      "from": "auth",
+      "to": "rls",
+      "label": "JWT",
+      "variant": "security",
+      "labelDy": 24
+    },
+    {
+      "id": "queries",
+      "from": "browser",
+      "to": "rls",
+      "label": "REST / HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gated",
+      "from": "rls",
+      "to": "postgres",
+      "label": "allowed rows",
+      "variant": "security"
+    },
+    {
+      "id": "wal",
+      "from": "postgres",
+      "to": "realtime",
+      "label": "row changes",
+      "labelDy": 24
+    },
+    {
+      "id": "live",
+      "from": "realtime",
+      "to": "browser",
+      "label": "live updates",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "GitHub — the source of truth",
+      "items": [
+        "One repo in the Savills org holds the entire app.",
+        "index.html is the app; config.js holds the project URL and publishable key.",
+        "The publishable key is public on purpose — it identifies the project, it does not grant access.",
+        "No secrets live here. The service_role key has never been committed."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Vercel — hosting and deploys",
+      "items": [
+        "Watches main. A push is the deployment; there is no build step.",
+        "Serves two static files worldwide over HTTPS.",
+        "Rollback is picking an earlier deployment.",
+        "Hobby tier bars commercial use — this needs Pro."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Supabase — data, auth and realtime",
+      "items": [
+        "Postgres in an EU region, chosen at creation and fixed thereafter.",
+        "Nine tables: people, accounts, sites, devices, issues, comments, activity, reviews, outcomes.",
+        "Auth issues a JWT carrying the signed-in email address.",
+        "Realtime streams row changes so every open browser stays in step."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Why a public page is safe",
+      "items": [
+        "Anyone can read the source and take the key; it gets them nothing.",
+        "Every table denies by default, then allows only a verified @savills.ie address.",
+        "Verified from outside: anonymous reads return empty, anonymous writes are refused.",
+        "Account names live in the database, never in the page."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "What is deliberately absent",
+      "items": [
+        "No server of ours. The browser talks to Postgres directly.",
+        "No build pipeline, no node_modules, no framework.",
+        "No password reset yet — email is throttled until SMTP is configured.",
+        "Still on personal-tier accounts: the open governance question."
+      ]
+    }
+  ]
+}
