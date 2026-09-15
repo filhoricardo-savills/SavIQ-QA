@@ -2186,7 +2186,9 @@ function renderAdmin(){
     '<div class="card-body" style="border-top:1px solid var(--line)"><p class="hint" style="margin:0">'+
       'People appear here the first time they sign in &mdash; there is nobody to invite and no account to create. '+
       'Send them the link; anyone with an approved Savills address is let in, and everyone else is refused by the database. '+
-      'You can correct your own display name above.</p></div></div>';
+      'You can correct your own display name above.</p>'+
+      '<button class="btn btn-sm" data-act="change-password" style="margin-top:10px">Change my password</button>'+
+      '</div></div>';
 
   /* ---------- Workspace ---------- */
   const workspace = '<div class="card"><div class="card-head"><h3>Workspace</h3></div><div class="card-body">'+
@@ -2425,6 +2427,33 @@ function dayModal(ds){
       '<button class="t" data-open="'+i.id+'">'+esc(i.title)+'</button>'+catChip(i.category)+prioPill(i.priority)+
       '<span class="mono" style="font-size:11px;color:var(--muted)">'+esc(acctName(i.accountCode))+'</span></div>').join("")+'</div></div>');
 }
+
+function passwordModal(){
+  showModal('<div class="sheet" style="max-width:420px"><div class="sheet-head"><h3>Change your password</h3>'+
+    '<span class="topbar-spacer"></span><button class="icon-btn" data-act="close-modal">'+icon('<path d="M18 6L6 18M6 6l12 12"/>')+'</button></div>'+
+    '<div class="sheet-body"><div class="form-grid">'+
+      '<div class="fl full"><label for="pwNew">New password</label>'+
+        '<input id="pwNew" type="password" data-autofocus autocomplete="new-password" placeholder="at least 8 characters"></div>'+
+      '<div class="fl full"><label for="pwNew2">Type it again</label>'+
+        '<input id="pwNew2" type="password" autocomplete="new-password"></div>'+
+    '</div>'+
+    '<p class="hint" style="margin:12px 0 0">If you were given a shared starting password, change it now. '+
+    'Your name is stamped on every issue, comment and review decision you make, so it should only be you signing in as you.</p>'+
+    '<div id="pwMsg"></div></div>'+
+    '<div class="sheet-foot"><button class="btn" data-act="close-modal">Cancel</button>'+
+      '<button class="btn btn-primary" data-act="save-password">Change password</button></div></div>');
+}
+
+async function savePassword(){
+  const a = $("#pwNew").value||"", b = $("#pwNew2").value||"";
+  const msg = t => { $("#pwMsg").innerHTML = '<div class="gate-msg err" style="margin-top:12px">'+esc(t)+'</div>'; };
+  if(a.length < 8) return msg("Use at least 8 characters.");
+  if(a !== b)      return msg("The two passwords do not match.");
+  const {error} = await sb.auth.updateUser({password:a});
+  if(error) return msg(error.message);
+  closeModal();
+  toast("Password changed");
+}
 /* ============================================================
    EXCEL EXPORT
    ============================================================ */
@@ -2642,6 +2671,8 @@ document.addEventListener("click", async e=>{
   switch(d.act){
     case "new-issue": quickAddModal(); break;
     case "add-devices": addDevicesModal(); break;
+    case "change-password": passwordModal(); break;
+    case "save-password": await savePassword(); break;
     case "save-devices": await saveDevices(); break;
     case "dh-clear": ui.dhHealth = null; render(); break;
     case "close-modal": closeModal(); break;
