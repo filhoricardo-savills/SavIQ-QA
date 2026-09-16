@@ -2920,11 +2920,11 @@ function anRestore(){
   try{
     const raw = sessionStorage.getItem(AN_STORE_KEY); if(!raw) return;
     const s = JSON.parse(raw);
-    AN.bundle = s.bundle||null; AN.drafts = s.drafts||[]; AN.picks = s.picks||{};
+    AN.bundle = s.bundle||null; AN.drafts = s.drafts||[]; AN.picks = s.picks||{}; AN.accountCode = s.accountCode||"";
   }catch(e){}
 }
 function anPersist(){
-  try{ sessionStorage.setItem(AN_STORE_KEY, JSON.stringify({bundle:AN.bundle, drafts:AN.drafts, picks:AN.picks})); }catch(e){}
+  try{ sessionStorage.setItem(AN_STORE_KEY, JSON.stringify({bundle:AN.bundle, drafts:AN.drafts, picks:AN.picks, accountCode:AN.accountCode})); }catch(e){}
 }
 
 /* the fingerprint travels in Tags as ref:xxxx, so an existing issue is findable */
@@ -3013,13 +3013,16 @@ function renderAnalysis(){
   });
   const ticked = AN.drafts.filter(d=>AN.picks[d.reference] && AN.picks[d.reference].include).length;
 
+  const runAcct = (AN.drafts[0] && AN.picks[AN.drafts[0].reference] && AN.picks[AN.drafts[0].reference].accountCode) || AN.accountCode || "";
   h += '<div class="card"><div class="card-head"><h3>Findings to raise</h3>'+
+    (runAcct ? '<span class="pill s-prog" style="margin-left:8px" title="Set when the run started; every issue raised from it lands on this account">'+esc(runAcct+" \u00b7 "+acctName(runAcct))+'</span>' : '')+
     '<div class="seg" style="margin-left:12px"><button data-anf="all" aria-pressed="'+(AN.filter==="all")+'">All '+AN.drafts.length+'</button>'+
       '<button data-anf="new" aria-pressed="'+(AN.filter==="new")+'">Not yet raised '+(AN.drafts.length-already)+'</button>'+
       '<button data-anf="raised" aria-pressed="'+(AN.filter==="raised")+'">Already raised '+already+'</button></div>'+
     '<span class="topbar-spacer"></span>'+
     '<button class="btn btn-sm" data-act="an-tick-all">Tick all new</button>'+
     '<button class="btn btn-sm" data-act="an-untick-all">Untick all</button>'+
+    '<button class="btn btn-sm" data-act="an-export" title="The full results workbook, one row per meter, one column per check">Export results to Excel</button>'+
     '<button class="btn btn-sm btn-primary" data-act="an-create"'+(ticked?'':' disabled')+'>Raise '+ticked+' issue'+(ticked===1?'':'s')+'</button>'+
     '</div>';
 
@@ -3029,22 +3032,21 @@ function renderAnalysis(){
       : 'No issues flagged by the configured checks.')+'</p></div></div>';
   } else {
     h += '<div class="tscroll"><table class="plain" style="min-width:980px"><thead><tr>'+
-      '<th style="width:32px"></th><th>Finding</th><th style="width:150px">Account</th><th style="width:130px">Type</th>'+
-      '<th style="width:96px">Priority</th><th style="width:118px">Due</th><th>Device</th><th style="width:90px"></th></tr></thead><tbody>'+
+      '<th style="width:32px"></th><th>Finding</th><th style="width:130px">Type</th>'+
+      '<th style="width:96px">Priority</th><th style="width:118px">Due</th><th style="width:220px">Comment</th><th>Device</th><th style="width:90px"></th></tr></thead><tbody>'+
       shown.map(d=>{
         const p = AN.picks[d.reference] || {};
         const existing = issueByFingerprint(d.reference);
         return '<tr'+(existing?' style="opacity:.6"':'')+'>'+
           '<td><input type="checkbox" data-anpick="'+d.reference+'"'+(p.include?" checked":"")+(existing?' disabled title="already raised as '+esc(existing.ref)+'"':'')+'></td>'+
           '<td><input class="cellsel" data-anfield="title" data-anref="'+d.reference+'" value="'+esc(p.title||d.title)+'" style="font-weight:500">'+
-            '<div class="hint" style="margin-top:2px">'+esc(d.findings)+' &middot; '+esc(d.location)+'</div></td>'+
-          '<td><select class="cellsel" data-anfield="accountCode" data-anref="'+d.reference+'"><option value="">— pick —</option>'+
-            accountsSorted().map(a=>'<option value="'+a.code+'"'+((p.accountCode||"")===a.code?" selected":"")+'>'+a.code+'</option>').join("")+'</select></td>'+
+            '<div class="hint" style="margin-top:2px">'+esc((d.headlines||[d.findings]).join(" \u00b7 "))+' &middot; '+esc(d.location)+'</div></td>'+
           '<td><select class="cellsel" data-anfield="category" data-anref="'+d.reference+'">'+
             CATEGORIES.map(c=>'<option value="'+c.id+'"'+((p.category||"")===c.id?" selected":"")+'>'+c.name+'</option>').join("")+'</select></td>'+
           '<td><select class="cellsel" data-anfield="priority" data-anref="'+d.reference+'">'+
             PRIORITIES.map(x=>'<option value="'+x.id+'"'+((p.priority||"")===x.id?" selected":"")+'>'+x.name+'</option>').join("")+'</select></td>'+
           '<td><input class="cellsel" type="date" data-anfield="dueDate" data-anref="'+d.reference+'" value="'+esc(p.dueDate||"")+'"></td>'+
+          '<td><input class="cellsel" data-anfield="note" data-anref="'+d.reference+'" placeholder="quick note, becomes the first comment" value="'+esc(p.note||"")+'"'+(existing?' disabled':'')+'></td>'+
           '<td><span style="font-size:12.5px">'+esc(d.meter)+'</span><div class="hint mono" style="margin-top:1px">'+esc(d.device_key)+'</div></td>'+
           '<td>'+(existing
             ? '<button class="btn btn-sm" data-open="'+existing.id+'">'+esc(existing.ref)+'</button>'
@@ -3096,7 +3098,7 @@ async function anRun(){
   const {data:{session}} = await sb.auth.getSession();
   if(!session){ toast("Your session expired. Sign in again."); return; }
 
-  AN.running = true; AN.error = null; AN.progress = "Connecting and discovering meters…"; AN.bundle = null; AN.drafts = []; AN.picks = {};
+  AN.running = true; AN.error = null; AN.progress = "Connecting and discovering meters…"; AN.bundle = null; AN.drafts = []; AN.picks = {}; AN.accountCode = acct;
   render();
   const client = new SavIQ.DexmaClient(token, session.access_token, {retries:2});
   try{
@@ -3111,7 +3113,7 @@ async function anRun(){
     AN.drafts.forEach(d=>{
       const mode = (bundle.results.find(r=>String(r.device_id)===String(d.device_id))||{}).qa_mode||"";
       const existing = issueByFingerprint(d.reference);
-      AN.picks[d.reference] = { include: false, accountCode: acct, title: d.title,
+      AN.picks[d.reference] = { include: false, accountCode: acct, title: d.title, note: "",
         category: anCategoryFor(d.findings, mode), priority: d.suggested_priority==="High"?"high":"medium", dueDate: due, raised: !!existing };
     });
     anPersist();
@@ -3153,12 +3155,170 @@ async function anCreateIssues(){
         siteId, meterId, category: p.category, priority: p.priority, dueDate: p.dueDate || null,
         tags: ["saviq", d.month, "ref:"+d.reference]
       });
-      if(issue){ done++; p.include = false; } else failed++;
+      if(issue){
+        if(p.note && p.note.trim()) await addComment(issue.id, p.note.trim());
+        done++; p.include = false; p.note = "";
+      } else failed++;
     }catch(e){ console.error(e); failed++; }
   }
   anPersist();
   render();
   toast(failed ? (done+" raised · "+failed+" failed") : (done+" issue"+(done===1?"":"s")+" raised"));
+}
+
+/* ------------------------------------------------------------
+   Results workbook — the same three sheets the Streamlit tool produced,
+   with the same colour coding. SheetJS cannot write cell fills, so this
+   one export loads ExcelJS on demand rather than adding a megabyte to
+   every page load.
+   ------------------------------------------------------------ */
+function loadScriptOnce(src){
+  return new Promise((resolve, reject)=>{
+    if(document.querySelector('script[src="'+src+'"]') && window.ExcelJS) return resolve();
+    const el = document.createElement("script"); el.src = src;
+    el.onload = ()=>resolve(); el.onerror = ()=>reject(new Error("Could not load the Excel library."));
+    document.head.appendChild(el);
+  });
+}
+
+async function anExportExcel(){
+  const b = AN.bundle; if(!b){ toast("Run an analysis first."); return; }
+  toast("Preparing the workbook…");
+  try{ await loadScriptOnce("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"); }
+  catch(e){ toast(e.message); return; }
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Meter QA Review";
+  const settings = b.settings;
+  const monthText = new Date(b.month+"T00:00:00Z").toLocaleDateString("en-IE",{month:"long",year:"numeric",timeZone:"UTC"});
+  const palette = { OK:["E2F0D9","215E21"], ISSUE:["FCE4D6","9C0006"], REVIEW:["D9EAF7","1F4E79"],
+                    "NOT CHECKED":["FFF2CC","7F6000"], "N/A":["E7E6E6","595959"], DISABLED:["E7E6E6","595959"] };
+  const ink = "243746", navy = "19354A";
+
+  const styleCell = (c, opts) => {
+    c.alignment = { vertical:"top", wrapText:true };
+    c.font = Object.assign({ name:"Calibri", size:11, color:{argb:"FF"+ink} }, opts&&opts.font||{});
+    if(opts && opts.fill) c.fill = { type:"pattern", pattern:"solid", fgColor:{argb:"FF"+opts.fill} };
+  };
+  const heading = (ws, title, subtitle, headers, widths, freeze) => {
+    ws.views = [{ showGridLines:false, state:"frozen", ySplit:4, xSplit:freeze||0 }];
+    ws.mergeCells(1,1,1,headers.length);
+    const t = ws.getCell(1,1); t.value = title; styleCell(t, {font:{size:18,bold:true,color:{argb:"FF"+navy}}});
+    ws.getRow(1).height = 30;
+    ws.mergeCells(2,1,2,headers.length);
+    const st = ws.getCell(2,1); st.value = subtitle; styleCell(st); ws.getRow(2).height = 34;
+    headers.forEach((h,i)=>{
+      const c = ws.getCell(4,i+1); c.value = h;
+      styleCell(c, {fill:navy, font:{bold:true,color:{argb:"FFFFFFFF"}}});
+      ws.getColumn(i+1).width = widths[i];
+    });
+    ws.getRow(4).height = 36;
+    ws.pageSetup = { orientation:"landscape", paperSize:8, fitToPage:true, fitToWidth:1, fitToHeight:0, printTitlesRow:"1:4" };
+  };
+
+  const ignoredText = b.ignored_count
+    ? " Excluded before meter calls: "+b.ignored_group_count+" G keys, "+b.ignored_dd_count+" DD keys, "+b.ignored_retired_count+" archive/deactivated; "+b.ignored_count+" total."
+    : "";
+  const scopeText = (b.complete?"COMPLETE":"PARTIAL")+" run. "+b.checked_count+" of "+b.device_count+" eligible meters checked."+ignoredText;
+
+  /* ---------- Results ---------- */
+  const results = wb.addWorksheet("Results");
+  const rHeaders = ["Location","Meter","Device key","DEXMA ID","Overall result"].concat(SavIQ.CHECK_COLUMNS, ["Notes / skipped checks"]);
+  heading(results, "SavIQ meter QA — "+monthText,
+    scopeText+" Green: OK. Red: issue details. Blue: peak observation for review only. Amber: not fully checked. Grey: N/A or disabled.",
+    rHeaders, [26,32,24,20,24].concat(SavIQ.CHECK_COLUMNS.map(()=>36), [70]), 5);
+
+  /* ---------- Evidence ---------- */
+  const evidence = wb.addWorksheet("Evidence");
+  const eFields = [["Location","building"],["Meter","device_name"],["Device key","device_key"],["DEXMA ID","device_id"],
+    ["QA mode","qa_mode"],["Parameter","parameter_key"],["Units","parameter_units"],["Expected points","expected_points"],
+    ["Available points","available_points"],["Availability (%)","availability_pct"],["Longest gap (hours)","longest_gap_hours"],
+    ["Longest zero run (hours)","longest_zero_run_hours"],["Current total","current_total"],["Prior-year month total","baseline_median"],
+    ["Year-over-year change (%)","change_vs_baseline_pct"],["Flagged peak hours","peak_flag_count"],
+    ["Peak hours screened","peak_checked_count"],["Usable hourly readings","peak_total_count"],
+    ["Strongest comparison value","peak_value"],["Comparison threshold","peak_threshold"],
+    ["Comparison timestamp (UTC*)","peak_timestamp"],["Peak method","peak_method"],["Findings","comment"]];
+  heading(evidence, "Measurements and peak evidence — "+monthText,
+    "Strongest comparison = highest reading / threshold ratio, not necessarily the largest monthly reading. *Naive API timestamps are assumed UTC.",
+    eFields.map(f=>f[0]), [26,32,24,20].concat(eFields.slice(4,-1).map(()=>24), [80]), 4);
+
+  const rows = SavIQ.exportRows(b);
+  rows.forEach((row, i)=>{
+    const r = i + 5;
+    const checks = SavIQ.perCheckResults(row, settings);
+    const overall = SavIQ.overallResultLabel(row, settings);
+    [row.building||"", row.device_name||"", row.device_key||"", row.device_id||"", overall].forEach((v,c)=>{ const cell=results.getCell(r,c+1); cell.value=v; styleCell(cell); });
+    const oc = results.getCell(r,5);
+    const [fill, font] = overall.startsWith("Issue") ? ["FCE4D6","9C0006"] : overall==="OK" ? ["E2F0D9","215E21"]
+                       : overall==="OK - With warning" ? ["D9EAF7","1F4E79"] : ["FFF2CC","7F6000"];
+    styleCell(oc, {fill, font:{bold:true,color:{argb:"FF"+font}}});
+    SavIQ.CHECK_COLUMNS.forEach((name, k)=>{
+      const [state, detail] = checks[name];
+      const text = state==="OK" ? "OK" : (state==="ISSUE" ? detail : state+": "+detail);
+      const cell = results.getCell(r, 6+k); cell.value = text;
+      const [f, fc] = palette[state] || palette["N/A"];
+      styleCell(cell, {fill:f, font:{color:{argb:"FF"+fc}, bold:(state==="OK"||state==="ISSUE")}});
+    });
+    const nc = results.getCell(r, rHeaders.length); nc.value = row.skipped_checks || row.comment || ""; styleCell(nc);
+    results.getRow(r).height = 100;
+
+    eFields.forEach(([h,k], c)=>{
+      const cell = evidence.getCell(r, c+1);
+      const v = row[k]; cell.value = (v===null||v===undefined) ? "" : v;
+      styleCell(cell);
+      if(c>=7 && c<=19 && typeof v==="number") cell.numFmt = "#,##0.00";
+    });
+    evidence.getRow(r).height = 64;
+  });
+  const last = Math.max(4, rows.length + 4);
+  results.autoFilter = { from:{row:4,column:1}, to:{row:last,column:rHeaders.length} };
+  evidence.autoFilter = { from:{row:4,column:1}, to:{row:last,column:eFields.length} };
+
+  /* ---------- Findings (the curation list, as reviewed) ---------- */
+  const findings = wb.addWorksheet("Findings");
+  const fHeaders = ["Raised?","Finding","Account","Type","Priority","Due","Comment","Meter","Device key","Location","Reference"];
+  heading(findings, "Findings — "+monthText, "One row per formal finding. Raised? shows whether an issue already exists in Meter QA Review for it.", fHeaders, [10,60,10,16,10,12,30,30,22,26,18]);
+  AN.drafts.forEach((d, i)=>{
+    const p = AN.picks[d.reference] || {};
+    const existing = issueByFingerprint(d.reference);
+    const vals = [existing ? existing.ref : "", p.title||d.title, p.accountCode||"", (CAT[p.category]||{}).name||"", (PR[p.priority]||{}).name||"",
+                  p.dueDate||"", p.note||"", d.meter, d.device_key, d.location, d.reference];
+    vals.forEach((v,c)=>{ const cell=findings.getCell(i+5,c+1); cell.value=v; styleCell(cell); });
+    if(existing) styleCell(findings.getCell(i+5,1), {fill:"E2F0D9", font:{bold:true,color:{argb:"FF215E21"}}});
+  });
+
+  /* ---------- Run settings ---------- */
+  const rs = wb.addWorksheet("Run settings");
+  heading(rs, "Run settings and interpretation", "Snapshot of the settings used for this download. No token is included.", ["Setting","Value"], [36,120]);
+  const settingsRows = [
+    ["Source","Meter QA Review — in-app analysis"], ["Analysis month", monthText], ["Generated UTC", b.created_at],
+    ["Run status", scopeText], ["Run failure", b.failure||""], ["Eligible meters", b.device_count],
+    ["Ignored G group devices", b.ignored_group_count], ["Ignored DD devices", b.ignored_dd_count],
+    ["Ignored archive/deactivated devices or locations", b.ignored_retired_count], ["Total excluded devices", b.ignored_count],
+    ["Ignored-device rule","Device keys starting G_, G-, DD_ or DD- are excluded case-insensitively. Archive/deactivated text is checked in device keys, meter names and resolved location names. Exclusions happen before parameter or readings requests."],
+    ["Availability minimum (%)", settings.availability_threshold], ["Missing gap allowed (hours)", settings.max_allowed_gap_hours],
+    ["Zero-run flag threshold (hours)", settings.zero_run_threshold_hours],
+    ["Gap / zero boundary","Gap is flagged when greater than the allowed hours. Zeros are flagged at or above the threshold. Zero threshold 0 disables that check."],
+    ["Year-over-year threshold (%)", settings.monthly_change_threshold],
+    ["Historical peak rule","Every usable hour: max(Q3 + 3 × IQR, 1.5 × positive median) for the same historical hour and weekday/weekend group. 20 samples minimum, including 8 positive values."],
+    ["Year-over-year comparison","Enabled: one monthly request for the same calendar month in the previous year."],
+    ["Extended peak history", settings.peak_history_enabled ? "Enabled" : "Disabled by default to reduce API load. Current-month fallback peak screening remains visible as a limited check."],
+    ["Fallback peak multiplier", settings.peak_multiplier],
+    ["Fallback rule","max(positive Q3 + 3 × positive IQR, positive median × fallback multiplier); at least 24 current readings and 8 positive readings. Fallback-only passes are amber, not green."],
+    ["History / limitations","Previous 12 months. Not weather-normalised or adjusted for seasonal/operational changes. A flag requires investigation; it does not prove a bad reading."],
+    ["Timestamp limitation","Comparisons use UTC for offset-aware timestamps and assume UTC for naive timestamps. Nominal 24-hour days are used for availability and gaps. Review daylight-saving and site-timezone effects."],
+    ["Partial runs","Unprocessed meters in the discovery snapshot are included and marked NOT CHECKED. A partial run does not establish that the full account is clear."],
+    ["Statistical reference","https://www.itl.nist.gov/div898/handbook/eda/section3/boxplot.htm — Q3 + 3 × IQR outer fence. Added sample rules and median margin are application-specific."]
+  ];
+  settingsRows.forEach(([k,v], i)=>{
+    const a = rs.getCell(i+5,1), c = rs.getCell(i+5,2); a.value = k; c.value = v; styleCell(a, {font:{bold:true}}); styleCell(c);
+    rs.getRow(i+5).height = 44;
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const prefix = b.complete ? "" : "PARTIAL_";
+  saveBlob(new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+           prefix+"saviq_results_"+b.month.slice(0,7)+".xlsx");
 }
 
 /* ============================================================
@@ -3222,6 +3382,7 @@ document.addEventListener("click", async e=>{
     case "an-run": await anRun(); break;
     case "an-create": await anCreateIssues(); break;
     case "an-preview": anPreviewModal(d.ref); break;
+    case "an-export": await anExportExcel(); break;
     case "an-tick-all": AN.drafts.forEach(x=>{ const p=AN.picks[x.reference]; if(p && !issueByFingerprint(x.reference)) p.include=true; }); anPersist(); render(); break;
     case "an-untick-all": Object.values(AN.picks).forEach(p=>p.include=false); anPersist(); render(); break;
     case "apply-import": await applyImport(); break;

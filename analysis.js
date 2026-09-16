@@ -807,8 +807,29 @@
     return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
   }
 
+  /* One line per finding, with the number that matters in it. "Consumption
+     change" says nothing; "Consumption up 200% vs same month last year" is
+     the whole issue. Order matches the tags so the first headline pairs with
+     the first tag. */
+  function findingHeadlines(row, settings) {
+    const out = [];
+    const av = row.availability_pct, ch = row.change_vs_baseline_pct;
+    if (row.qa_mode === "monthly_fallback") out.push("No hourly readings \u2014 monthly total used instead");
+    else if ((row.current_total === null || row.current_total === undefined) && (row.available_points || 0) === 0) out.push("No readings returned for the month");
+    if (row.qa_mode === "hourly") {
+      if (av !== null && av !== undefined && av < settings.availability_threshold) out.push("Availability " + av.toFixed(0) + "% (minimum " + settings.availability_threshold + "%)");
+      if ((row.longest_gap_hours || 0) > settings.max_allowed_gap_hours) out.push("Missing gap of " + row.longest_gap_hours + " hours");
+      if (settings.zero_run_threshold_hours > 0 && (row.longest_zero_run_hours || 0) >= settings.zero_run_threshold_hours) out.push("Zero readings for " + row.longest_zero_run_hours + " consecutive hours");
+    }
+    if (ch !== null && ch !== undefined && Math.abs(ch) >= settings.monthly_change_threshold)
+      out.push("Consumption " + (ch > 0 ? "up" : "down") + " " + Math.abs(ch).toFixed(0) + "% vs same month last year");
+    if (!out.length) out.push("Meter data review");
+    return out;
+  }
+
   async function issueDraft(row, month, settings) {
     const tags = [], actions = [];
+    const headlines = findingHeadlines(row, settings);
     const availability = row.availability_pct;
     if (row.qa_mode === "monthly_fallback") { tags.push("Missing hourly readings"); actions.push("Check the hourly feed and expected reading frequency; monthly totals do not establish hourly completeness."); }
     else if ((row.current_total === null || row.current_total === undefined) && (row.available_points || 0) === 0) { tags.push("Missing readings"); actions.push("Check the meter connection or manual reading submission and recover missing readings."); }
@@ -843,7 +864,9 @@
       "\n\nCheck limitations\n" + (row.skipped_checks || "No skipped checks reported.") +
       "\nHourly checks use a nominal 24-hour calendar day; review daylight-saving transitions and the meter timezone." +
       "\n\nDraft reference: " + ref;
-    return { reference: ref, title: row.device_name + " — " + tags[0] + " — " + monthText, suggested_priority: priority,
+    const shortMonth = parseDateOnly(month).toLocaleDateString("en-IE", { month: "short", year: "numeric", timeZone: "UTC" });
+    const title = row.device_name + " \u2014 " + headlines[0] + (headlines.length > 1 ? " (+" + (headlines.length - 1) + " more)" : "") + " \u2014 " + shortMonth;
+    return { reference: ref, title, headlines, suggested_priority: priority,
       findings: tags.join(", "), location: row.building, meter: row.device_name, device_key: row.device_key,
       device_id: row.device_id, month: month.slice(0, 7), description };
   }
@@ -854,6 +877,16 @@
     return out;
   }
 
-  window.SavIQ = { DexmaClient, DexmaApiError, DEFAULT_SETTINGS, CHECK_COLUMNS, runAccountQA, draftsForBundle,
+  function exportRows(bundle) {
+    const rows = bundle.results.slice();
+    const checked = new Set(rows.map(r => String(r.device_id)));
+    for (const m of (bundle.scope || [])) {
+      if (!checked.has(String(m.device_id)))
+        rows.push(Object.assign({}, m, { status: "Not checked", qa_mode: "", comment: "Run stopped before this meter was checked.", skipped_checks: bundle.failure || "" }));
+    }
+    return rows;
+  }
+
+  window.SavIQ = { DexmaClient, DexmaApiError, DEFAULT_SETTINGS, CHECK_COLUMNS, runAccountQA, draftsForBundle, exportRows, findingHeadlines,
     issueDraft, perCheckResults, overallResultLabel, formalIssueNames, addMonths, monthEnd, utcDate, isoDate, displayNumber };
 })();
