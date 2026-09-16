@@ -555,6 +555,7 @@ table.plain tr:last-child td{border-bottom:0}
 <aside id="drawer" aria-label="Issue detail" aria-hidden="true"></aside>
 <div id="modal" role="dialog" aria-modal="true"></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="xlsxFile" accept=".xlsx,.xls" class="sr" aria-label="Choose a workbook to import">
 <div class="offline" id="offline">Connection lost &mdash; changes are not being saved</div>
 
 <script>
@@ -648,7 +649,7 @@ const ts = s => s ? new Date(s).getTime() : null;
 const mapUser    = r => ({id:r.id, name:r.name, role:r.role, email:r.email, active:r.active});
 const mapAccount = r => ({id:r.code, code:r.code, name:r.name, ownerId:r.owner_id});
 const mapSite    = r => ({id:r.id, accountCode:r.account_code, name:r.name});
-const mapDevice  = r => ({id:r.id, accountCode:r.account_code, siteId:r.site_id, ref:r.ref});
+const mapDevice  = r => ({id:r.id, accountCode:r.account_code, siteId:r.site_id, ref:r.ref, name:r.name||""});
 
 function mapIssue(r){
   const prev = state.issues[r.id];
@@ -971,6 +972,11 @@ const userName = id => (state.users[id] && state.users[id].name) || "Unassigned"
 const acctName = code => (state.accounts[code] && state.accounts[code].name) || code || "—";
 const siteName = id => (state.sites[id] && state.sites[id].name) || "";
 const meterRef = id => (state.meters[id] && state.meters[id].ref) || "";
+const meterName = id => (state.meters[id] && state.meters[id].name) || "";
+/* Marina's request: a key like 10012345678 means nothing to a human, so lead
+   with the name wherever a device is shown and keep the key as the identifier. */
+const deviceLabel = id => { const m=state.meters[id]; if(!m) return "";
+  return m.name ? m.name+"  ·  "+m.ref : m.ref; };
 
 function allIssues(){ return Object.values(state.issues); }
 function accountsSorted(){ return Object.values(state.accounts).sort((a,b)=>Number(a.code)-Number(b.code)); }
@@ -998,13 +1004,14 @@ function visibleIssues(){
     const q = ui.q.toLowerCase();
     list = list.filter(i=>{
       const hay = [i.ref,i.title,i.description,acctName(i.accountCode),i.accountCode,
-                   siteName(i.siteId),meterRef(i.meterId),(i.tags||[]).join(" "),
+                   siteName(i.siteId),meterRef(i.meterId),meterName(i.meterId),(i.tags||[]).join(" "),
                    CAT[i.category]?CAT[i.category].name:""].join(" ").toLowerCase();
       return hay.includes(q);
     });
   }
   if(ui.cats.size) list = list.filter(i=>ui.cats.has(i.category));
   if(ui.mineOnly && ME) list = list.filter(i=>i.ownerId===ME.id||i.reporterId===ME.id);
+  if(ui.owner) list = list.filter(i=> ui.owner==="none" ? !i.ownerId : i.ownerId===ui.owner);
   if(!ui.showClosed) list = list.filter(i=>i.status!=="closed");
   return list;
 }
@@ -1014,7 +1021,7 @@ function visibleIssues(){
    ============================================================ */
 const ui = {
   view:"dashboard", account:null, q:"", cats:new Set(),
-  mineOnly:false, showClosed:false, group:"account", collapsed:new Set(),
+  mineOnly:false, owner:null, showClosed:false, group:"account", collapsed:new Set(),
   openIssueId:null, sessionId:null, sessionTab:"agenda",
   calMonth:null, tlWeeks:12, dhWeeks:26, dhHealth:null
 };
@@ -1051,7 +1058,7 @@ function dueHTML(i){
 function locationLine(i){
   const bits=[];
   if(i.siteId && state.sites[i.siteId]) bits.push(siteName(i.siteId));
-  if(i.meterId && state.meters[i.meterId]) bits.push(meterRef(i.meterId));
+  if(i.meterId && state.meters[i.meterId]) bits.push(meterName(i.meterId) || meterRef(i.meterId));
   return bits.join(" · ");
 }
 /* ============================================================
@@ -1152,13 +1159,21 @@ async function resolveSite(accountCode, name){
   return data.id;
 }
 
-async function resolveMeter(accountCode, siteId, ref){
+async function resolveMeter(accountCode, siteId, ref, name){
   const r = String(ref||"").trim(); if(!r || !accountCode) return null;
+  const nm = String(name||"").trim();
   const found = Object.values(state.meters).find(
     m=>m.accountCode===accountCode && m.ref.toLowerCase()===r.toLowerCase());
-  if(found) return found.id;
+  if(found){
+    /* fill in a name we did not have before, but never overwrite one someone typed */
+    if(nm && !found.name){
+      await sb.from("devices").update({name:nm}).eq("id", found.id);
+      state.meters[found.id] = Object.assign({}, found, {name:nm}); Store._emit();
+    }
+    return found.id;
+  }
   const {data, error} = await sb.from("devices")
-    .insert({account_code:accountCode, site_id:siteId||null, ref:r}).select().maybeSingle();
+    .insert({account_code:accountCode, site_id:siteId||null, ref:r, name:nm||null}).select().maybeSingle();
   if(error){
     const {data:again} = await sb.from("devices").select("*")
       .eq("account_code",accountCode).ilike("ref",r).maybeSingle();
@@ -1498,11 +1513,16 @@ function toolbarHTML(opts){
   h += '<div class="seg" role="group" aria-label="Scope">'+
     '<button data-scope="all" aria-pressed="'+(!ui.mineOnly)+'">All issues</button>'+
     '<button data-scope="mine" aria-pressed="'+ui.mineOnly+'">Mine</button></div>';
+  h += '<div class="field"><label for="ownerFilter">Owner</label><select class="mini" id="ownerFilter">'+
+    '<option value="">Anyone</option>'+
+    '<option value="none"'+(ui.owner==="none"?" selected":"")+'>Unassigned</option>'+
+    usersSorted().map(u=>'<option value="'+u.id+'"'+(ui.owner===u.id?" selected":"")+'>'+
+      esc(u.name)+(ME&&u.id===ME.id?" (me)":"")+'</option>').join("")+'</select></div>';
   h += '<button class="chip-filter" data-toggle="closed" aria-pressed="'+ui.showClosed+'">Show closed</button>';
   h += '<span style="width:1px;height:20px;background:var(--line)"></span>';
   h += CATEGORIES.map(c=>'<button class="chip-filter" data-cat="'+c.id+'" aria-pressed="'+ui.cats.has(c.id)+'">'+
         '<span style="width:7px;height:7px;border-radius:2px;background:'+c.color+';display:inline-block"></span>'+c.name+'</button>').join("");
-  if(ui.cats.size||ui.q||ui.account) h += '<button class="btn btn-sm btn-ghost" data-act="clear-filters">Clear filters</button>';
+  if(ui.cats.size||ui.q||ui.account||ui.owner) h += '<button class="btn btn-sm btn-ghost" data-act="clear-filters">Clear filters</button>';
   h += '</div>';
   return h;
 }
@@ -1795,7 +1815,7 @@ function renderDevices(){
   if(ui.account) devices = devices.filter(m=>m.accountCode===ui.account);
   if(ui.q){
     const q = ui.q.toLowerCase();
-    devices = devices.filter(m=>(m.ref+" "+siteName(m.siteId)+" "+acctName(m.accountCode)).toLowerCase().includes(q));
+    devices = devices.filter(m=>(m.ref+" "+(m.name||"")+" "+siteName(m.siteId)+" "+acctName(m.accountCode)).toLowerCase().includes(q));
   }
 
   const rows = devices.map(m=>Object.assign({m}, deviceStats(m, fromTs)));
@@ -1870,8 +1890,8 @@ function renderDevices(){
         const m = r.m;
         h += '<div class="dh-lane">'+
           '<div class="dh-l">'+
-            '<span class="dh-key" title="'+esc(m.ref)+'">'+esc(m.ref)+'</span>'+
-            '<span class="dh-site">'+esc(siteName(m.siteId)||"No site recorded")+'</span>'+
+            '<span class="dh-key" title="'+esc(m.name ? m.name+" · "+m.ref : m.ref)+'">'+esc(m.name||m.ref)+'</span>'+
+            '<span class="dh-site">'+esc((m.name?m.ref+" · ":"")+(siteName(m.siteId)||"No site"))+'</span>'+
           '</div>'+
           '<div class="dh-track">'+
             months.map(mo=>'<span class="dh-gl" style="left:'+mo.left+'%"></span>').join("")+
@@ -1921,9 +1941,11 @@ function addDevicesModal(){
       '<div class="fl"><label for="adSite">Site <span style="font-weight:400">(optional)</span></label>'+
         '<input id="adSite" list="adSiteList" placeholder="applies to all keys below"><datalist id="adSiteList">'+
         Object.values(state.sites).map(s=>'<option value="'+esc(s.name)+'"></option>').join("")+'</datalist></div>'+
-      '<div class="fl full"><label for="adKeys">SavIQ Device Keys</label>'+
-        '<textarea id="adKeys" rows="8" data-autofocus placeholder="One key per line — paste a column straight from Excel."></textarea></div>'+
-    '</div><p class="hint" style="margin:10px 0 0">Keys that already exist on this account are skipped, so you can safely paste the same list twice.</p></div>'+
+      '<div class="fl full"><label for="adKeys">Devices</label>'+
+        '<textarea id="adKeys" rows="8" data-autofocus placeholder="One per line. Key only, or key and name:&#10;10012345678&#10;10098776554, ELEC_Main incomer"></textarea></div>'+
+    '</div><p class="hint" style="margin:10px 0 0">One device per line. Add a comma and a name to label it &mdash; '+
+      '<span class="mono">10012345678, ELEC_Main incomer</span> &mdash; and that name is what people see when raising an issue. '+
+      'Keys that already exist are skipped, so pasting the same list twice is safe.</p></div>'+
     '<div class="sheet-foot"><button class="btn" data-act="close-modal">Cancel</button>'+
       '<button class="btn btn-primary" data-act="save-devices">Register devices</button></div></div>');
 }
@@ -1931,11 +1953,18 @@ function addDevicesModal(){
 async function saveDevices(){
   const accountCode = $("#adAcct").value;
   if(!accountCode){ toast("Pick the account these devices belong to."); $("#adAcct").focus(); return; }
-  const keys = $("#adKeys").value.split(/[\n,;\t]/).map(k=>k.trim()).filter(Boolean);
-  if(!keys.length){ toast("Paste at least one device key."); $("#adKeys").focus(); return; }
+  /* one device per line; an optional name after the first comma */
+  const lines = $("#adKeys").value.split(/[\n;]/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){ toast("Paste at least one device."); $("#adKeys").focus(); return; }
   const siteId = await resolveSite(accountCode, $("#adSite").value);
   const before = Object.keys(state.meters).length;
-  for(const k of keys) await resolveMeter(accountCode, siteId, k);
+  for(const line of lines){
+    const c = line.indexOf(",");
+    const key  = (c<0 ? line : line.slice(0,c)).trim();
+    const name = (c<0 ? ""   : line.slice(c+1)).trim();
+    if(key) await resolveMeter(accountCode, siteId, key, name);
+  }
+  const keys = lines;
   const added = Object.keys(state.meters).length - before;
   closeModal();
   toast(added+" device"+(added===1?"":"s")+" registered"+(keys.length-added?" · "+(keys.length-added)+" already known":""));
@@ -2202,6 +2231,7 @@ function renderAdmin(){
     '<div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">'+
       '<button class="btn" data-act="export-all">Export everything to Excel</button>'+
       '<button class="btn" data-act="export-workspace">Download a JSON backup</button>'+
+      '<button class="btn btn-primary" data-act="pick-import">Import issues from Excel</button>'+
       (orphanCount()&&admin?'<button class="btn" data-act="prune-register">Clear '+orphanCount()+' unused register entries</button>':"")+
     '</div>'+
     '<p class="hint" style="margin:12px 0 0">Supabase backs the database up on its own schedule. These exports are for sharing, and for keeping a copy off the platform.</p>'+
@@ -2228,11 +2258,12 @@ function renderAdmin(){
   const register = '<div class="card"><div class="card-head"><h3>Site &amp; device register</h3>'+
     '<button class="btn btn-sm" style="margin-left:auto" data-act="add-devices">Register devices</button></div>'+
     (meterCount
-      ? '<div class="tscroll capped"><table class="plain reg-table"><thead><tr><th>Account</th><th>Site</th><th>SavIQ Device Key</th><th title="Issues raised">Iss.</th></tr></thead><tbody>'+
+      ? '<div class="tscroll capped"><table class="plain reg-table"><thead><tr><th>Account</th><th>Site</th><th>Device name</th><th>SavIQ Device Key</th><th title="Issues raised">Iss.</th></tr></thead><tbody>'+
         Object.values(state.meters).sort((a,b)=>(a.accountCode+a.ref).localeCompare(b.accountCode+b.ref)).map(m=>{
           const n = allIssues().filter(i=>i.meterId===m.id).length;
           return '<tr><td style="font-size:12.5px">'+esc(acctName(m.accountCode))+'</td>'+
             '<td style="font-size:12.5px">'+esc(siteName(m.siteId)||"—")+'</td>'+
+            '<td style="font-size:12.5px">'+esc(m.name||"—")+'</td>'+
             '<td class="mono" style="font-size:12px">'+esc(m.ref)+'</td>'+
             '<td class="num"'+(n>2?' style="color:var(--crit);font-weight:600" title="repeat offender"':"")+'>'+n+'</td></tr>';
         }).join("")+'</tbody></table></div>'
@@ -2281,12 +2312,13 @@ function renderDrawer(){
           '<span class="stack">'+
           '<select id="dwMeter" data-f="meterId"'+(i.accountCode?"":" disabled")+'>'+
             '<option value="">'+(i.accountCode?"— none —":"— pick an account first —")+'</option>'+
-            metersForAcct.sort((a,b)=>a.ref.localeCompare(b.ref)).map(m=>
-              '<option value="'+m.id+'"'+(i.meterId===m.id?" selected":"")+'>'+esc(m.ref)+
+            metersForAcct.sort((a,b)=>(a.name||a.ref).localeCompare(b.name||b.ref)).map(m=>
+              '<option value="'+m.id+'"'+(i.meterId===m.id?" selected":"")+'>'+
+              esc(m.name ? m.name+"  ·  "+m.ref : m.ref)+
               (siteName(m.siteId)?"  ·  "+esc(siteName(m.siteId)):"")+'</option>').join("")+
             (i.accountCode?'<option value="__new">+ Add a new device key…</option>':"")+
           '</select>'+
-          '<input id="dwMeterNew" class="hide" placeholder="New device key, then press Enter">'+
+          '<input id="dwMeterNew" class="hide" placeholder="New key, or key, name — then Enter">'+
           '</span>'+
         '<label for="dwCat">Issue type</label><select id="dwCat" data-f="category">'+
           CATEGORIES.map(c=>'<option value="'+c.id+'"'+(i.category===c.id?" selected":"")+'>'+c.name+'</option>').join("")+'</select>'+
@@ -2370,7 +2402,8 @@ function quickAddModal(prefAcct){
         Object.values(state.sites).map(s=>'<option value="'+esc(s.name)+'"></option>').join("")+'</datalist></div>'+
       '<div class="fl"><label for="qMeter">SavIQ Device Key <span style="font-weight:400">(optional)</span></label>'+
         '<select id="qMeter">'+deviceOptions(acct, "")+'</select>'+
-        '<input id="qMeterNew" class="hide" style="margin-top:5px" placeholder="New device key"></div>'+
+        '<input id="qMeterNew" class="hide" style="margin-top:5px" placeholder="New device key">'+
+        '<input id="qMeterName" class="hide" style="margin-top:5px" placeholder="Device name (optional)"></div>'+
       '<div class="fl"><label for="qPrio">Priority</label><select id="qPrio">'+
         PRIORITIES.map(p=>'<option value="'+p.id+'"'+(p.id==="medium"?" selected":"")+'>'+p.name+'</option>').join("")+'</select></div>'+
       '<div class="fl"><label for="qDue">Due</label><input id="qDue" type="date" value="'+iso(addDays(mondayOf(new Date()),7))+'"></div>'+
@@ -2393,7 +2426,8 @@ function deviceOptions(accountCode, selectedId){
   const list = Object.values(state.meters).filter(m=>m.accountCode===accountCode)
                      .sort((a,b)=>a.ref.localeCompare(b.ref));
   return '<option value="">— none —</option>'+
-    list.map(m=>'<option value="'+m.id+'"'+(selectedId===m.id?" selected":"")+'>'+esc(m.ref)+
+    list.map(m=>'<option value="'+m.id+'"'+(selectedId===m.id?" selected":"")+'>'+
+      esc(m.name ? m.name+"  ·  "+m.ref : m.ref)+
       (siteName(m.siteId)?"  ·  "+esc(siteName(m.siteId)):"")+'</option>').join("")+
     '<option value="__new">+ Add a new device key…</option>';
 }
@@ -2406,7 +2440,7 @@ async function saveQuickAdd(again){
   const siteId = await resolveSite(accountCode, $("#qSite").value);
   const pick = $("#qMeter").value;
   const meterId = pick==="__new"
-    ? await resolveMeter(accountCode, siteId, $("#qMeterNew").value)
+    ? await resolveMeter(accountCode, siteId, $("#qMeterNew").value, $("#qMeterName").value)
     : (pick || null);
   const issue = await createIssue({
     title, accountCode, siteId, meterId,
@@ -2461,7 +2495,7 @@ function issueRow(i){
   return {
     Ref: i.ref, Issue: i.title,
     "Account code": i.accountCode, Account: acctName(i.accountCode),
-    Site: siteName(i.siteId), "SavIQ Device Key": meterRef(i.meterId),
+    Site: siteName(i.siteId), "Device name": meterName(i.meterId), "SavIQ Device Key": meterRef(i.meterId),
     Type: (CAT[i.category]||{}).name || i.category,
     Priority: (PR[i.priority]||{}).name || i.priority,
     Status: (ST[i.status]||{}).name || i.status,
@@ -2503,7 +2537,7 @@ function workbookAll(){
   })));
   addSheet(wb, "Device register", Object.values(state.meters).map(m=>({
     "Account code":m.accountCode, Account:acctName(m.accountCode), Site:siteName(m.siteId),
-    "SavIQ Device Key":m.ref, Issues: allIssues().filter(i=>i.meterId===m.id).length
+    "Device name":m.name||"", "SavIQ Device Key":m.ref, Issues: allIssues().filter(i=>i.meterId===m.id).length
   })));
   const rev = [];
   sessionsSorted().forEach(s=>{
@@ -2616,6 +2650,245 @@ function exportWorkspace(){
            "meter-qa-backup "+todayISO()+".json");
 }
 /* ============================================================
+   EXCEL IMPORT
+
+   Round-trip of the Issues sheet: export, edit in Excel, bring it back.
+   The Ref column is the key. A recognised ref updates that issue; a blank
+   ref creates a new one. Rows deleted from the sheet are NOT deleted here —
+   a filtered spreadsheet must never be able to wipe the backlog.
+   Nothing is written until the preview is confirmed.
+   ============================================================ */
+const IMPORT_FIELDS = {
+  "ref":"ref", "reference":"ref",
+  "issue":"title", "title":"title",
+  "detail":"description", "description":"description",
+  "account code":"accountCode", "account":"accountName",
+  "site":"siteName", "location":"siteName",
+  "device name":"deviceName", "meter":"deviceName",
+  "saviq device key":"deviceRef", "device key":"deviceRef", "meter / mprn":"deviceRef",
+  "type":"category", "issue type":"category", "findings":"category",
+  "priority":"priority", "suggested_priority":"priority",
+  "status":"status",
+  "owner":"ownerName", "raised by":"reporterName",
+  "start date":"startDate", "due date":"dueDate",
+  "repeats":"recurrence", "tags":"tags"
+};
+
+const byLabel = (list, v) => {
+  const t = String(v || "").trim().toLowerCase();
+  if(!t) return null;
+  return list.find(x => x.name.toLowerCase() === t) || null;
+};
+
+function userByName(v){
+  const t = String(v || "").trim().toLowerCase();
+  if(!t || t === "unassigned") return null;
+  return usersSorted().find(u => u.name.toLowerCase() === t) || null;
+}
+
+function excelDate(v){
+  if(v === null || v === undefined || v === "") return null;
+  if(v instanceof Date && !isNaN(v)) return iso(v);
+  if(typeof v === "number"){                        /* Excel serial number */
+    const d = new Date(Math.round((v - 25569) * 86400000));
+    return isNaN(d) ? null : iso(d);
+  }
+  const t = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  const d = new Date(t);
+  return isNaN(d) ? null : iso(d);
+}
+
+function readWorkbook(buf){
+  const wb = XLSX.read(buf, {type:"array", cellDates:true});
+  const sheet = wb.SheetNames.find(x => /issue/i.test(x)) || wb.SheetNames[0];
+  if(!sheet) throw new Error("That workbook has no sheets.");
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], {defval:"", raw:false, cellDates:true});
+  if(!rows.length) throw new Error("Sheet “" + sheet + "” has no rows.");
+  return {sheet, rows};
+}
+
+function planImport(rows){
+  const plan = {updates:[], creates:[], skipped:[], sheetRows:rows.length};
+  const byRef = {};
+  allIssues().forEach(i => { byRef[String(i.ref).trim().toUpperCase()] = i; });
+
+  rows.forEach((raw, idx) => {
+    const r = {};
+    for(const k of Object.keys(raw)){
+      const f = IMPORT_FIELDS[String(k).trim().toLowerCase()];
+      if(f && r[f] === undefined) r[f] = raw[k];
+    }
+    const line = idx + 2;                           /* +1 header, +1 for 1-based */
+    const title = String(r.title || "").trim();
+    const refKey = String(r.ref || "").trim().toUpperCase();
+
+    if(!title && !refKey) return;                   /* blank spacer row */
+    if(!title){ plan.skipped.push({line, why:"no issue title"}); return; }
+
+    /* account: code wins, then name */
+    let code = String(r.accountCode || "").trim();
+    if(code && !state.accounts[code]) code = "";
+    if(!code && r.accountName){
+      const a = byLabel(accountsSorted(), r.accountName);
+      if(a) code = a.code;
+    }
+
+    const cat   = byLabel(CATEGORIES, r.category);
+    const prio  = byLabel(PRIORITIES, r.priority);
+    const stat  = byLabel(STATUSES, r.status);
+    const rec   = byLabel(RECURRENCE, r.recurrence);
+    const owner = userByName(r.ownerName);
+
+    const patch = {title:title};
+    if(r.description !== undefined) patch.description = String(r.description || "");
+    if(code)  patch.accountCode = code;
+    if(cat)   patch.category = cat.id;
+    if(prio)  patch.priority = prio.id;
+    if(stat)  patch.status = stat.id;
+    if(rec)   patch.recurrence = rec.id;
+    if(owner) patch.ownerId = owner.id;
+    const sd = excelDate(r.startDate), dd = excelDate(r.dueDate);
+    if(sd) patch.startDate = sd;
+    if(dd) patch.dueDate = dd;
+    if(r.tags !== undefined && String(r.tags).trim())
+      patch.tags = String(r.tags).split(",").map(t => t.trim()).filter(Boolean);
+
+    const device = {
+      ref:  String(r.deviceRef || "").trim(),
+      name: String(r.deviceName || "").trim(),
+      site: String(r.siteName || "").trim()
+    };
+
+    const existing = refKey ? byRef[refKey] : null;
+
+    if(refKey && !existing){
+      plan.skipped.push({line, title, why:"ref " + refKey + " is not in this workspace"});
+      return;
+    }
+
+    if(existing){
+      const diffs = [];
+      for(const k of Object.keys(patch)){
+        const before = k === "tags" ? (existing.tags || []).join(", ") : existing[k];
+        const after  = k === "tags" ? patch.tags.join(", ") : patch[k];
+        if(String(before == null ? "" : before) !== String(after == null ? "" : after)) diffs.push(k);
+      }
+      if(device.ref && meterRef(existing.meterId).toLowerCase() !== device.ref.toLowerCase()) diffs.push("device");
+      if(!diffs.length){ plan.skipped.push({line, title, why:"no change"}); return; }
+      plan.updates.push({line, issue:existing, patch, device, diffs});
+    } else {
+      if(!code){ plan.skipped.push({line, title, why:"no account, and a new issue needs one"}); return; }
+      plan.creates.push({line, patch, device});
+    }
+  });
+  return plan;
+}
+
+function importPreviewModal(plan, fileName){
+  const row = (x, kind) =>
+    '<tr><td class="num" style="color:var(--muted)">' + x.line + '</td>' +
+    '<td>' + (kind === "update"
+      ? '<span class="mono" style="font-size:11px">' + x.issue.ref + '</span>'
+      : '<span class="tag">new</span>') + '</td>' +
+    '<td style="max-width:300px">' + esc(x.patch.title) + '</td>' +
+    '<td style="font-size:11.5px;color:var(--muted)">' +
+      (kind === "update" ? esc(x.diffs.join(", ")) : esc(acctName(x.patch.accountCode))) +
+    '</td></tr>';
+
+  const total = plan.updates.length + plan.creates.length;
+
+  showModal('<div class="sheet wide"><div class="sheet-head"><h3>Import preview</h3>' +
+    '<span class="topbar-spacer"></span><button class="icon-btn" data-act="close-modal">' +
+      icon('<path d="M18 6L6 18M6 6l12 12"/>') + '</button></div>' +
+    '<div class="sheet-body">' +
+    '<div class="grid-tiles" style="margin-bottom:12px">' +
+      '<div class="tile accent"><span class="v">' + plan.updates.length + '</span><span class="l">Issues to update</span></div>' +
+      '<div class="tile ok"><span class="v">' + plan.creates.length + '</span><span class="l">New issues to raise</span></div>' +
+      '<div class="tile"><span class="v">' + plan.skipped.length + '</span><span class="l">Rows skipped</span>' +
+        '<span class="d">unchanged or unusable</span></div>' +
+    '</div>' +
+    '<p class="hint" style="margin-top:0">From <strong>' + esc(fileName) + '</strong>, ' + plan.sheetRows + ' data rows. ' +
+      'Nothing has been written yet. Rows you deleted from the spreadsheet are left alone &mdash; import never deletes.</p>' +
+    (total
+      ? '<div class="tscroll capped" style="margin-top:12px"><table class="plain" style="min-width:560px">' +
+        '<thead><tr><th>Row</th><th>Ref</th><th>Issue</th><th>Changes</th></tr></thead><tbody>' +
+        plan.updates.map(x => row(x, "update")).join("") +
+        plan.creates.map(x => row(x, "create")).join("") +
+        '</tbody></table></div>'
+      : '<div class="banner" style="margin-top:12px"><span class="sp">Nothing to apply. Every row either matched the current data exactly or could not be read.</span></div>') +
+    (plan.skipped.length
+      ? '<div class="dw-sec" style="margin-top:14px"><h4>Skipped rows</h4><div class="tscroll capped">' +
+        '<table class="plain" style="min-width:420px"><tbody>' +
+        plan.skipped.slice(0, 60).map(x =>
+          '<tr><td class="num" style="width:50px;color:var(--muted)">' + x.line + '</td>' +
+          '<td style="font-size:12px">' + esc(x.title || "") + '</td>' +
+          '<td style="font-size:12px;color:var(--muted)">' + esc(x.why) + '</td></tr>').join("") +
+        '</tbody></table></div>' +
+        (plan.skipped.length > 60 ? '<p class="hint">and ' + (plan.skipped.length - 60) + ' more</p>' : '') +
+        '</div>'
+      : '') +
+    '</div>' +
+    '<div class="sheet-foot"><button class="btn" data-act="close-modal">Cancel</button>' +
+      '<button class="btn btn-primary" data-act="apply-import"' + (total ? '' : ' disabled') + '>' +
+      'Apply ' + total + ' change' + (total === 1 ? '' : 's') + '</button></div></div>');
+}
+
+let PENDING_IMPORT = null;
+
+async function applyImport(){
+  const plan = PENDING_IMPORT;
+  if(!plan) return;
+  const btn = $("#modal [data-act=apply-import]");
+  if(btn){ btn.disabled = true; btn.textContent = "Applying…"; }
+  let done = 0, failed = 0;
+
+  for(const u of plan.updates){
+    try{
+      const patch = Object.assign({}, u.patch);
+      if(u.device.ref){
+        const siteId = u.device.site ? await resolveSite(u.issue.accountCode, u.device.site) : u.issue.siteId;
+        const mid = await resolveMeter(u.issue.accountCode, siteId, u.device.ref, u.device.name);
+        if(mid){ patch.meterId = mid; if(siteId) patch.siteId = siteId; }
+      }
+      const st = patch.status;
+      delete patch.status;
+      await updateIssue(u.issue.id, patch, "updated from an Excel import");
+      if(st && st !== u.issue.status) await setStatus(u.issue.id, st);
+      done++;
+    }catch(e){ console.error("import update", e); failed++; }
+  }
+
+  for(const c of plan.creates){
+    try{
+      const siteId = c.device.site ? await resolveSite(c.patch.accountCode, c.device.site) : null;
+      const mid = c.device.ref ? await resolveMeter(c.patch.accountCode, siteId, c.device.ref, c.device.name) : null;
+      const issue = await createIssue(Object.assign({}, c.patch, {siteId:siteId, meterId:mid}));
+      if(issue) done++; else failed++;
+    }catch(e){ console.error("import create", e); failed++; }
+  }
+
+  PENDING_IMPORT = null;
+  closeModal();
+  render();
+  toast(failed
+    ? (done + " applied · " + failed + " failed — see the browser console")
+    : (done + " change" + (done === 1 ? "" : "s") + " applied"));
+}
+
+async function handleWorkbook(file){
+  try{
+    const buf = await file.arrayBuffer();
+    const parsed = readWorkbook(buf);
+    PENDING_IMPORT = planImport(parsed.rows);
+    importPreviewModal(PENDING_IMPORT, file.name + " · " + parsed.sheet);
+  }catch(e){
+    console.error("import", e);
+    toast(e && e.message ? e.message : "That file could not be read as a workbook.");
+  }
+}
+
+/* ============================================================
    EVENT WIRING
    ============================================================ */
 let renderQueued = false;
@@ -2671,6 +2944,8 @@ document.addEventListener("click", async e=>{
   switch(d.act){
     case "new-issue": quickAddModal(); break;
     case "add-devices": addDevicesModal(); break;
+    case "pick-import": { const f=$("#xlsxFile"); f.value=""; f.click(); break; }
+    case "apply-import": await applyImport(); break;
     case "change-password": passwordModal(); break;
     case "save-password": await savePassword(); break;
     case "save-devices": await saveDevices(); break;
@@ -2711,7 +2986,7 @@ document.addEventListener("click", async e=>{
     case "export-session": await downloadWorkbook(workbookSession(state.sessions[ui.sessionId]),
         "QA review "+state.sessions[ui.sessionId].date+".xlsx"); break;
     case "export-all": await downloadWorkbook(workbookAll(), "Meter QA log "+todayISO()+".xlsx"); break;
-    case "clear-filters": ui.cats.clear(); ui.q=""; ui.account=null; ui.mineOnly=false; $("#searchInput").value=""; render(); break;
+    case "clear-filters": ui.cats.clear(); ui.q=""; ui.account=null; ui.mineOnly=false; ui.owner=null; $("#searchInput").value=""; render(); break;
   }
 });
 
@@ -2731,15 +3006,18 @@ document.addEventListener("change", async e=>{
   if(el.id==="qAcct"){
     const sel = $("#qMeter"); if(sel) sel.innerHTML = deviceOptions(el.value, "");
     const box = $("#qMeterNew"); if(box){ box.classList.add("hide"); box.value=""; }
+    const nm = $("#qMeterName"); if(nm){ nm.classList.add("hide"); nm.value=""; }
     return;
   }
   if(el.id==="qMeter"){
-    const box = $("#qMeterNew"); if(!box) return;
+    const box = $("#qMeterNew"), nm = $("#qMeterName"); if(!box) return;
     const add = el.value==="__new";
     box.classList.toggle("hide", !add);
-    if(add){ box.value=""; box.focus(); }
+    if(nm) nm.classList.toggle("hide", !add);
+    if(add){ box.value=""; if(nm) nm.value=""; box.focus(); }
     return;
   }
+  if(el.id==="ownerFilter"){ ui.owner = el.value || null; render(); return; }
   if(el.id==="groupBy"){ ui.group=el.value; render(); }
   if(el.id==="sessNotes") return updateSession(ui.sessionId, {notes:el.value});
   if(el.id==="dwTitle"||el.id==="dwDesc"){
@@ -2775,11 +3053,21 @@ document.addEventListener("keydown", async e=>{
   if(e.key!=="Enter" || e.target.id!=="dwMeterNew") return;
   e.preventDefault();
   const i = state.issues[ui.openIssueId]; if(!i) return;
-  const ref = e.target.value.trim();
+  const raw = e.target.value.trim();
+  if(!raw){ e.target.classList.add("hide"); renderDrawer(); return; }
+  const c = raw.indexOf(",");
+  const ref  = (c<0 ? raw : raw.slice(0,c)).trim();
+  const name = (c<0 ? ""  : raw.slice(c+1)).trim();
   if(!ref){ e.target.classList.add("hide"); renderDrawer(); return; }
-  const mid = await resolveMeter(i.accountCode, i.siteId, ref);
-  await updateIssue(i.id, {meterId:mid}, "set device key to "+ref);
-  toast(ref+" registered");
+  const mid = await resolveMeter(i.accountCode, i.siteId, ref, name);
+  await updateIssue(i.id, {meterId:mid}, "set device to "+(name||ref));
+  toast((name||ref)+" registered");
+});
+
+$("#xlsxFile").addEventListener("change", async e=>{
+  const f = e.target.files && e.target.files[0];
+  if(f) await handleWorkbook(f);
+  e.target.value = "";
 });
 
 $("#scrim").addEventListener("click", closeDrawer);
