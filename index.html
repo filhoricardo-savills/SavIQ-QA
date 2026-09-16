@@ -2237,6 +2237,25 @@ function renderAdmin(){
     '<p class="hint" style="margin:12px 0 0">Supabase backs the database up on its own schedule. These exports are for sharing, and for keeping a copy off the platform.</p>'+
     '</div></div>';
 
+  /* ---------- SavIQ analysis round trip ---------- */
+  const saviqUrl = (window.QA_CONFIG && window.QA_CONFIG.SAVIQ_ANALYSIS_URL) || "";
+  const analysis = '<div class="card"><div class="card-head"><h3>SavIQ meter analysis</h3>' +
+    (saviqUrl ? '<a class="btn btn-sm btn-primary" style="margin-left:auto" href="' + esc(saviqUrl) +
+       '" target="_blank" rel="noopener">Open the analysis tool</a>' : '') + '</div>' +
+    '<div class="card-body">' +
+    '<p class="hint" style="margin-top:0">The analysis tool reads a DEXMA account for a chosen month and flags every meter ' +
+      'it can: missing readings, gaps, prolonged zeros, unusual peaks and year-on-year swings. It finds everything; ' +
+      'you decide what is worth tracking.</p>' +
+    '<ol class="steps">' +
+      '<li>Open the analysis tool and run a completed month.</li>' +
+      '<li>On <strong>Send to Meter QA Review</strong>, tick only the findings worth chasing and download the workbook.</li>' +
+      '<li>Come back here and use <strong>Import issues from Excel</strong> above. Every row is previewed before anything is written.</li>' +
+    '</ol>' +
+    (saviqUrl ? '' :
+      '<p class="hint" style="margin:0"><strong>No link configured.</strong> Add <span class="mono">SAVIQ_ANALYSIS_URL</span> ' +
+      'to <span class="mono">config.js</span> and the button appears here.</p>') +
+    '</div></div>';
+
   /* ---------- Accounts ---------- */
   const accounts = '<div class="card"><div class="card-head"><h3>Accounts &amp; owners</h3>'+
     '<span class="eyebrow" style="margin-left:auto">'+accountsSorted().length+' accounts'+
@@ -2271,7 +2290,7 @@ function renderAdmin(){
     '</div>';
 
   h += '<div class="admin-cols">'+
-        '<div class="admin-col">'+people+workspace+'</div>'+
+        '<div class="admin-col">'+people+workspace+analysis+'</div>'+
         '<div class="admin-col">'+accounts+register+'</div>'+
        '</div>';
 
