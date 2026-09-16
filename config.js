@@ -14,10 +14,5 @@
    --------------------------------------------------------------------------- */
 window.QA_CONFIG = {
   SUPABASE_URL: "https://bqlvtzjksuvgtlvrstmc.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_1-R8Ox8fElKf7MgHZj8Jcw_bD5JcBP_",
-
-  /* Optional. Where the SavIQ meter-analysis Streamlit app is running.
-     Set it and a link to it appears in Setup. Leave it blank and that
-     card simply explains the round trip without a button. */
-  SAVIQ_ANALYSIS_URL: ""
+  SUPABASE_ANON_KEY: "sb_publishable_1-R8Ox8fElKf7MgHZj8Jcw_bD5JcBP_"
 };

@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
+<script src="analysis.js"></script>
 <style>
 
 :root{
@@ -545,6 +546,7 @@ table.plain tr:last-child td{border-bottom:0}
       <section class="pane" id="pane-calendar"></section>
       <section class="pane" id="pane-timeline"></section>
       <section class="pane" id="pane-devices"></section>
+      <section class="pane" id="pane-analysis"></section>
       <section class="pane" id="pane-review"></section>
       <section class="pane" id="pane-admin"></section>
     </main>
@@ -1034,6 +1036,7 @@ const VIEWS = [
   {id:"calendar",  name:"Calendar",  icon:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'},
   {id:"timeline",  name:"Timeline",  icon:'<path d="M4 7h10M4 12h16M4 17h7"/>'},
   {id:"devices",   name:"Device health", icon:'<circle cx="12" cy="13" r="7"/><path d="M12 13l3.2-3.2"/><path d="M12 6V3"/><path d="M4.6 5.6l1.8 1.8"/><path d="M19.4 5.6l-1.8 1.8"/>'},
+  {id:"analysis",  name:"Meter analysis", icon:'<path d="M3 3v18h18"/><path d="M7 14l4-5 3 3 5-7"/><circle cx="19" cy="5" r="1.4"/>'},
   {id:"review",    name:"Weekly review", icon:'<path d="M9 11l2 2 4-4"/><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4"/>'},
   {id:"admin",     name:"Setup",     icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 11-4 0v-.1A1.6 1.6 0 005.4 20l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 003 15a2 2 0 010-4 1.6 1.6 0 001.5-2.6l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 0010 4.6V4a2 2 0 114 0v.1a1.6 1.6 0 002.7 1.1l.1-.1a2 2 0 112.8 2.8l-.1.1A1.6 1.6 0 0021 11a2 2 0 010 4z"/>'}
 ];
@@ -1342,6 +1345,7 @@ const TITLES = {
   calendar:["Calendar","Issues placed on their due date"],
   timeline:["Timeline","Start to due date across the coming weeks"],
   devices:["Device health check","Every registered SavIQ device, and how its issues have run over time"],
+  analysis:["Meter analysis","Run the SavIQ checks on a DEXMA account and raise only what matters"],
   review:["Weekly review","Run the call, then publish the carry-over report"],
   admin:["Setup","People, account ownership and workspace data"]
 };
@@ -1354,7 +1358,7 @@ function render(){
   renderRail();
   renderBanners();
   ({dashboard:renderDashboard, list:renderList, board:renderBoard, mine:renderMine,
-    calendar:renderCalendar, timeline:renderTimeline, devices:renderDevices,
+    calendar:renderCalendar, timeline:renderTimeline, devices:renderDevices, analysis:renderAnalysis,
     review:renderReview, admin:renderAdmin}[ui.view]||(()=>{}))();
   if(ui.openIssueId && state.issues[ui.openIssueId]) renderDrawer();
 }
@@ -2237,24 +2241,12 @@ function renderAdmin(){
     '<p class="hint" style="margin:12px 0 0">Supabase backs the database up on its own schedule. These exports are for sharing, and for keeping a copy off the platform.</p>'+
     '</div></div>';
 
-  /* ---------- SavIQ analysis round trip ---------- */
-  const saviqUrl = (window.QA_CONFIG && window.QA_CONFIG.SAVIQ_ANALYSIS_URL) || "";
+  /* ---------- meter analysis pointer ---------- */
   const analysis = '<div class="card"><div class="card-head"><h3>SavIQ meter analysis</h3>' +
-    (saviqUrl ? '<a class="btn btn-sm btn-primary" style="margin-left:auto" href="' + esc(saviqUrl) +
-       '" target="_blank" rel="noopener">Open the analysis tool</a>' : '') + '</div>' +
-    '<div class="card-body">' +
-    '<p class="hint" style="margin-top:0">The analysis tool reads a DEXMA account for a chosen month and flags every meter ' +
-      'it can: missing readings, gaps, prolonged zeros, unusual peaks and year-on-year swings. It finds everything; ' +
-      'you decide what is worth tracking.</p>' +
-    '<ol class="steps">' +
-      '<li>Open the analysis tool and run a completed month.</li>' +
-      '<li>On <strong>Send to Meter QA Review</strong>, tick only the findings worth chasing and download the workbook.</li>' +
-      '<li>Come back here and use <strong>Import issues from Excel</strong> above. Every row is previewed before anything is written.</li>' +
-    '</ol>' +
-    (saviqUrl ? '' :
-      '<p class="hint" style="margin:0"><strong>No link configured.</strong> Add <span class="mono">SAVIQ_ANALYSIS_URL</span> ' +
-      'to <span class="mono">config.js</span> and the button appears here.</p>') +
-    '</div></div>';
+    '<button class="btn btn-sm btn-primary" style="margin-left:auto" data-view-jump="analysis">Open Meter analysis</button></div>' +
+    '<div class="card-body"><p class="hint" style="margin:0">Runs the SavIQ checks on a DEXMA account for a chosen month, ' +
+      'inside this app. Findings land in a table; you tick the ones worth tracking and they become issues here directly. ' +
+      'Anything already raised is recognised and cannot be raised twice.</p></div></div>';
 
   /* ---------- Accounts ---------- */
   const accounts = '<div class="card"><div class="card-head"><h3>Accounts &amp; owners</h3>'+
@@ -2908,6 +2900,268 @@ async function handleWorkbook(file){
 }
 
 /* ============================================================
+   VIEW · METER ANALYSIS
+   The SavIQ checks, run in this tab against a DEXMA account. Findings
+   land in a curation table; only the ticked ones become issues. Anything
+   already raised (matched on its draft fingerprint) is spotted and
+   unticked, which is the one thing the old Excel round trip could not do.
+   The DEXMA token lives in this page for the duration of the run and is
+   never stored.
+   ============================================================ */
+const AN = {
+  running:false, progress:null, error:null,
+  bundle:null, drafts:[],
+  picks:{},            // reference -> {include, accountCode, title, category, priority, dueDate}
+  filter:"all"         // all | new | raised
+};
+const AN_STORE_KEY = "meterqa.analysis";
+
+function anRestore(){
+  try{
+    const raw = sessionStorage.getItem(AN_STORE_KEY); if(!raw) return;
+    const s = JSON.parse(raw);
+    AN.bundle = s.bundle||null; AN.drafts = s.drafts||[]; AN.picks = s.picks||{};
+  }catch(e){}
+}
+function anPersist(){
+  try{ sessionStorage.setItem(AN_STORE_KEY, JSON.stringify({bundle:AN.bundle, drafts:AN.drafts, picks:AN.picks})); }catch(e){}
+}
+
+/* the fingerprint travels in Tags as ref:xxxx, so an existing issue is findable */
+function issueByFingerprint(ref){
+  const tag = "ref:"+ref;
+  return allIssues().find(i=>(i.tags||[]).includes(tag)) || null;
+}
+
+function anCategoryFor(findings, qaMode){
+  const t = (findings||"").toLowerCase();
+  const monthly = qaMode==="monthly" || qaMode==="monthly_fallback";
+  if(t.includes("consumption change")) return "unusual-trend";
+  if(t.includes("missing hourly readings")) return "iot";
+  if(t.includes("missing readings")) return monthly ? "manual-reads" : "missing-data";
+  if(t.includes("prolonged zero")||t.includes("reading gaps")||t.includes("low data availability")) return "iot";
+  return "missing-data";
+}
+
+function anMonthOptions(){
+  const now = new Date(); const first = SavIQ.utcDate(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  const out = [];
+  for(let k=1;k<=36;k++){ const m = SavIQ.addMonths(first,-k); out.push({v:SavIQ.isoDate(m), l:m.toLocaleDateString("en-IE",{month:"long",year:"numeric",timeZone:"UTC"})}); }
+  return out;
+}
+
+function renderAnalysis(){
+  const pane = $("#pane-analysis");
+  if(!window.SavIQ){ pane.innerHTML = emptyState("Analysis module did not load","Reload the page. If it persists, analysis.js is missing from the deployment.",""); return; }
+  const savedAcct = ui.account || "";
+  const b = AN.bundle;
+
+  let h = '<div class="card" style="margin-bottom:12px"><div class="card-body">'+
+    '<div class="form-grid" style="grid-template-columns:2fr 1fr 1fr">'+
+      '<div class="fl"><label for="anToken">DEXMA token</label>'+
+        '<input id="anToken" type="password" autocomplete="off" placeholder="paste the permanent token for this DEXMA account"'+(AN.running?' disabled':'')+'>'+
+        '<span class="hint">Used for this run only. Never saved, never sent anywhere but DEXMA.</span></div>'+
+      '<div class="fl"><label for="anMonth">Month</label><select id="anMonth"'+(AN.running?' disabled':'')+'>'+
+        anMonthOptions().map((m,i)=>'<option value="'+m.v+'"'+(i===0?" selected":"")+'>'+m.l+'</option>').join("")+'</select></div>'+
+      '<div class="fl"><label for="anAcct">Savills account</label><select id="anAcct"'+(AN.running?' disabled':'')+'>'+
+        '<option value="">— pick —</option>'+accountsSorted().map(a=>'<option value="'+a.code+'"'+(savedAcct===a.code?" selected":"")+'>'+a.code+" · "+esc(a.name)+'</option>').join("")+'</select>'+
+        '<span class="hint">Set on every finding; change per row below if one token spans several.</span></div>'+
+    '</div>'+
+    '<details style="margin-top:12px"><summary class="hint" style="cursor:pointer">Check settings</summary>'+
+      '<div class="form-grid" style="grid-template-columns:repeat(3,1fr);margin-top:10px">'+
+        '<div class="fl"><label for="anAvail">Minimum availability (%)</label><input id="anAvail" type="number" min="0" max="100" step="1" value="90"></div>'+
+        '<div class="fl"><label for="anGap">Allowed missing gap (hours)</label><input id="anGap" type="number" min="0" max="744" value="48"></div>'+
+        '<div class="fl"><label for="anZero">Flag consecutive zeros after (hours; 0 off)</label><input id="anZero" type="number" min="0" max="744" value="48"></div>'+
+        '<div class="fl"><label for="anYoy">Flag year-over-year change (%)</label><input id="anYoy" type="number" min="1" max="1000" value="15"></div>'+
+        '<div class="fl"><label for="anPeakMult">Fallback peak multiplier</label><input id="anPeakMult" type="number" min="2" max="100" step="0.5" value="8"></div>'+
+        '<div class="fl"><label for="anPeakHist">Extended peak history</label><select id="anPeakHist"><option value="0" selected>Off (protects the DEXMA quota)</option><option value="1">On — one extra hourly-history call per meter</option></select></div>'+
+      '</div></details>'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap">'+
+      '<button class="btn btn-primary" data-act="an-run"'+(AN.running?' disabled':'')+'>'+(AN.running?"Analysing…":"Analyse month")+'</button>'+
+      (AN.running?'<span class="hint" id="anProgress">'+esc(AN.progress||"")+'</span>':'')+
+      (AN.error?'<span class="gate-msg err" style="margin:0;padding:6px 10px">'+esc(AN.error)+'</span>':'')+
+    '</div>'+
+    '</div></div>';
+
+  if(!b){
+    pane.innerHTML = h + emptyState("Nothing analysed yet",
+      "Paste a DEXMA token, choose a completed month, and run. Every accepted meter on that token is checked for availability, gaps, zero runs, unusual peaks and year-on-year change.","");
+    return;
+  }
+
+  /* ---------- results ---------- */
+  const rows = b.results;
+  const reviewed = rows.filter(r=>r.status==="Needs review").length;
+  const clear = rows.filter(r=>r.status==="Done" && !r.check_incomplete).length;
+  const incomplete = rows.filter(r=>r.check_incomplete).length;
+  const monthLabel = new Date(b.month+"T00:00:00Z").toLocaleDateString("en-IE",{month:"long",year:"numeric",timeZone:"UTC"});
+
+  h += (b.complete ? '' : '<div class="banner"><strong>Partial run.</strong><span class="sp">'+b.checked_count+' of '+b.device_count+' meters checked. '+esc(b.failure)+' Unchecked meters have no result.</span></div>');
+  h += '<div class="grid-tiles">'+
+    '<div class="tile accent"><span class="v">'+b.checked_count+'<span style="font-size:14px;color:var(--muted)"> / '+b.device_count+'</span></span><span class="l">Meters checked</span><span class="d">'+esc(monthLabel)+'</span></div>'+
+    '<div class="tile crit"><span class="v">'+AN.drafts.length+'</span><span class="l">Findings</span><span class="d">formal issues flagged</span></div>'+
+    '<div class="tile ok"><span class="v">'+clear+'</span><span class="l">Clear</span><span class="d">all active checks complete</span></div>'+
+    '<div class="tile warn"><span class="v">'+incomplete+'</span><span class="l">Incomplete checks</span><span class="d">'+reviewed+' need parameter review</span></div>'+
+    '<div class="tile"><span class="v">'+b.request_count+'</span><span class="l">API requests</span><span class="d">'+(b.ignored_count?b.ignored_count+' devices excluded':'nothing excluded')+'</span></div>'+
+    '</div>';
+
+  /* ---------- curation ---------- */
+  const already = AN.drafts.filter(d=>issueByFingerprint(d.reference)).length;
+  const shown = AN.drafts.filter(d=>{
+    const raised = !!issueByFingerprint(d.reference);
+    return AN.filter==="all" || (AN.filter==="raised" ? raised : !raised);
+  });
+  const ticked = AN.drafts.filter(d=>AN.picks[d.reference] && AN.picks[d.reference].include).length;
+
+  h += '<div class="card"><div class="card-head"><h3>Findings to raise</h3>'+
+    '<div class="seg" style="margin-left:12px"><button data-anf="all" aria-pressed="'+(AN.filter==="all")+'">All '+AN.drafts.length+'</button>'+
+      '<button data-anf="new" aria-pressed="'+(AN.filter==="new")+'">Not yet raised '+(AN.drafts.length-already)+'</button>'+
+      '<button data-anf="raised" aria-pressed="'+(AN.filter==="raised")+'">Already raised '+already+'</button></div>'+
+    '<span class="topbar-spacer"></span>'+
+    '<button class="btn btn-sm" data-act="an-tick-all">Tick all new</button>'+
+    '<button class="btn btn-sm" data-act="an-untick-all">Untick all</button>'+
+    '<button class="btn btn-sm btn-primary" data-act="an-create"'+(ticked?'':' disabled')+'>Raise '+ticked+' issue'+(ticked===1?'':'s')+'</button>'+
+    '</div>';
+
+  if(!AN.drafts.length){
+    h += '<div class="card-body"><p class="hint" style="margin:0">'+(incomplete||!b.complete
+      ? 'No formal findings in the completed results. Review the incomplete checks before treating this account as clear.'
+      : 'No issues flagged by the configured checks.')+'</p></div></div>';
+  } else {
+    h += '<div class="tscroll"><table class="plain" style="min-width:980px"><thead><tr>'+
+      '<th style="width:32px"></th><th>Finding</th><th style="width:150px">Account</th><th style="width:130px">Type</th>'+
+      '<th style="width:96px">Priority</th><th style="width:118px">Due</th><th>Device</th><th style="width:90px"></th></tr></thead><tbody>'+
+      shown.map(d=>{
+        const p = AN.picks[d.reference] || {};
+        const existing = issueByFingerprint(d.reference);
+        return '<tr'+(existing?' style="opacity:.6"':'')+'>'+
+          '<td><input type="checkbox" data-anpick="'+d.reference+'"'+(p.include?" checked":"")+(existing?' disabled title="already raised as '+esc(existing.ref)+'"':'')+'></td>'+
+          '<td><input class="cellsel" data-anfield="title" data-anref="'+d.reference+'" value="'+esc(p.title||d.title)+'" style="font-weight:500">'+
+            '<div class="hint" style="margin-top:2px">'+esc(d.findings)+' &middot; '+esc(d.location)+'</div></td>'+
+          '<td><select class="cellsel" data-anfield="accountCode" data-anref="'+d.reference+'"><option value="">— pick —</option>'+
+            accountsSorted().map(a=>'<option value="'+a.code+'"'+((p.accountCode||"")===a.code?" selected":"")+'>'+a.code+'</option>').join("")+'</select></td>'+
+          '<td><select class="cellsel" data-anfield="category" data-anref="'+d.reference+'">'+
+            CATEGORIES.map(c=>'<option value="'+c.id+'"'+((p.category||"")===c.id?" selected":"")+'>'+c.name+'</option>').join("")+'</select></td>'+
+          '<td><select class="cellsel" data-anfield="priority" data-anref="'+d.reference+'">'+
+            PRIORITIES.map(x=>'<option value="'+x.id+'"'+((p.priority||"")===x.id?" selected":"")+'>'+x.name+'</option>').join("")+'</select></td>'+
+          '<td><input class="cellsel" type="date" data-anfield="dueDate" data-anref="'+d.reference+'" value="'+esc(p.dueDate||"")+'"></td>'+
+          '<td><span style="font-size:12.5px">'+esc(d.meter)+'</span><div class="hint mono" style="margin-top:1px">'+esc(d.device_key)+'</div></td>'+
+          '<td>'+(existing
+            ? '<button class="btn btn-sm" data-open="'+existing.id+'">'+esc(existing.ref)+'</button>'
+            : '<button class="btn btn-sm btn-ghost" data-act="an-preview" data-ref="'+d.reference+'">Evidence</button>')+'</td>'+
+        '</tr>';
+      }).join("")+'</tbody></table></div>'+
+      '<div class="card-body" style="border-top:1px solid var(--line)"><p class="hint" style="margin:0">'+
+        'Ticked findings are raised as new issues with the full evidence in their description and the tags '+
+        '<span class="mono">saviq</span>, the month, and a <span class="mono">ref:</span> fingerprint. '+
+        'Findings already raised are matched on that fingerprint and cannot be ticked, so running the same month twice is safe.</p></div></div>';
+  }
+
+  /* ---------- all meters ---------- */
+  h += '<div class="card" style="margin-top:12px"><div class="card-head"><h3>All meters</h3>'+
+    '<span class="eyebrow" style="margin-left:auto">'+rows.length+' checked'+(b.ignored_count?' · '+b.ignored_count+' excluded':'')+'</span></div>'+
+    '<div class="tscroll capped" style="max-height:420px"><table class="plain" style="min-width:820px"><thead><tr>'+
+      '<th>Result</th><th>Location</th><th>Meter</th><th>Key</th><th>Mode</th><th style="text-align:right">Avail.</th><th>Notes</th></tr></thead><tbody>'+
+    rows.map(r=>{
+      const label = SavIQ.overallResultLabel(r, b.settings);
+      const cls = label.startsWith("Issue") ? "s-open" : label==="OK" ? "s-closed" : label.startsWith("OK") ? "s-prog" : "p-low";
+      return '<tr><td><span class="pill '+cls+'">'+esc(label)+'</span></td>'+
+        '<td style="font-size:12.5px">'+esc(r.building)+'</td><td style="font-size:12.5px">'+esc(r.device_name)+'</td>'+
+        '<td class="mono" style="font-size:11.5px">'+esc(r.device_key)+'</td><td style="font-size:12px">'+esc(r.qa_mode)+'</td>'+
+        '<td class="num" style="text-align:right">'+(r.availability_pct===null||r.availability_pct===undefined?"—":r.availability_pct.toFixed(1)+"%")+'</td>'+
+        '<td style="font-size:12px;color:var(--muted);max-width:360px;white-space:normal">'+esc(r.skipped_checks||"")+'</td></tr>';
+    }).join("")+'</tbody></table></div></div>';
+
+  pane.innerHTML = h;
+}
+
+function anReadSettings(){
+  const num = (id, d) => { const v = parseFloat(($("#"+id)||{}).value); return Number.isFinite(v) ? v : d; };
+  return Object.assign({}, SavIQ.DEFAULT_SETTINGS, {
+    availability_threshold: num("anAvail", 90), max_allowed_gap_hours: num("anGap", 48),
+    zero_run_threshold_hours: num("anZero", 48), monthly_change_threshold: num("anYoy", 15),
+    peak_multiplier: num("anPeakMult", 8), peak_history_enabled: ($("#anPeakHist")||{}).value==="1",
+    historical_comparisons_enabled: true
+  });
+}
+
+async function anRun(){
+  if(AN.running) return;
+  const token = ($("#anToken")||{}).value || "";
+  const monthIso = ($("#anMonth")||{}).value;
+  const acct = ($("#anAcct")||{}).value || "";
+  if(!token.trim()){ toast("Paste the DEXMA token first."); $("#anToken").focus(); return; }
+  if(!acct){ toast("Pick the Savills account these meters belong to."); $("#anAcct").focus(); return; }
+  const settings = anReadSettings();
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ toast("Your session expired. Sign in again."); return; }
+
+  AN.running = true; AN.error = null; AN.progress = "Connecting and discovering meters…"; AN.bundle = null; AN.drafts = []; AN.picks = {};
+  render();
+  const client = new SavIQ.DexmaClient(token, session.access_token, {retries:2});
+  try{
+    const month = new Date(monthIso+"T00:00:00Z");
+    const bundle = await SavIQ.runAccountQA(client, month, settings, (done,total,name)=>{
+      AN.progress = "Checking "+done+"/"+total+" · "+name;
+      const el = $("#anProgress"); if(el) el.textContent = AN.progress;
+    });
+    AN.bundle = bundle;
+    AN.drafts = await SavIQ.draftsForBundle(bundle);
+    const due = iso(addDays(new Date(), 14));
+    AN.drafts.forEach(d=>{
+      const mode = (bundle.results.find(r=>String(r.device_id)===String(d.device_id))||{}).qa_mode||"";
+      const existing = issueByFingerprint(d.reference);
+      AN.picks[d.reference] = { include: false, accountCode: acct, title: d.title,
+        category: anCategoryFor(d.findings, mode), priority: d.suggested_priority==="High"?"high":"medium", dueDate: due, raised: !!existing };
+    });
+    anPersist();
+    toast(bundle.checked_count+" meters checked · "+AN.drafts.length+" findings");
+  }catch(e){
+    console.error(e);
+    AN.error = (e && e.message) || "Analysis stopped unexpectedly.";
+  }finally{
+    client.close();
+    const t = $("#anToken"); if(t) t.value = "";
+    AN.running = false; AN.progress = null;
+    render();
+  }
+}
+
+function anPreviewModal(ref){
+  const d = AN.drafts.find(x=>x.reference===ref); if(!d) return;
+  showModal('<div class="sheet wide"><div class="sheet-head"><h3>'+esc(d.title)+'</h3>'+
+    '<span class="topbar-spacer"></span><button class="icon-btn" data-act="close-modal">'+icon('<path d="M18 6L6 18M6 6l12 12"/>')+'</button></div>'+
+    '<div class="sheet-body"><pre class="email">'+esc(d.description)+'</pre></div>'+
+    '<div class="sheet-foot"><button class="btn" data-act="close-modal">Close</button></div></div>');
+}
+
+async function anCreateIssues(){
+  const chosen = AN.drafts.filter(d=>AN.picks[d.reference] && AN.picks[d.reference].include && !issueByFingerprint(d.reference));
+  if(!chosen.length){ toast("Tick at least one finding."); return; }
+  const missing = chosen.filter(d=>!(AN.picks[d.reference].accountCode));
+  if(missing.length){ toast(missing.length+" ticked finding"+(missing.length===1?" has":"s have")+" no account."); return; }
+  if(!confirm("Raise "+chosen.length+" issue"+(chosen.length===1?"":"s")+" in Meter QA Review?")) return;
+
+  let done = 0, failed = 0;
+  for(const d of chosen){
+    const p = AN.picks[d.reference];
+    try{
+      const siteId = await resolveSite(p.accountCode, d.location);
+      const meterId = await resolveMeter(p.accountCode, siteId, d.device_key, d.meter);
+      const issue = await createIssue({
+        title: p.title || d.title, description: d.description, accountCode: p.accountCode,
+        siteId, meterId, category: p.category, priority: p.priority, dueDate: p.dueDate || null,
+        tags: ["saviq", d.month, "ref:"+d.reference]
+      });
+      if(issue){ done++; p.include = false; } else failed++;
+    }catch(e){ console.error(e); failed++; }
+  }
+  anPersist();
+  render();
+  toast(failed ? (done+" raised · "+failed+" failed") : (done+" issue"+(done===1?"":"s")+" raised"));
+}
+
+/* ============================================================
    EVENT WIRING
    ============================================================ */
 let renderQueued = false;
@@ -2919,7 +3173,7 @@ function safeRender(){ if(isEditing()){ renderQueued = true; return; } render();
 document.addEventListener("focusout", ()=>{ setTimeout(()=>{ if(renderQueued && !isEditing()){ renderQueued=false; render(); } }, 60); });
 
 document.addEventListener("click", async e=>{
-  const t = e.target.closest("[data-view],[data-acct],[data-open],[data-act],[data-tick],[data-collapse],[data-scope],[data-toggle],[data-cat],[data-quick-acct],[data-cal],[data-cal-day],[data-tlw],[data-dhw],[data-dhh],[data-session],[data-stab],[data-outcome],[data-del-user],[data-subtick],[data-subdel],[data-acct-jump],[data-view-jump]");
+  const t = e.target.closest("[data-view],[data-acct],[data-open],[data-act],[data-tick],[data-collapse],[data-scope],[data-toggle],[data-cat],[data-quick-acct],[data-cal],[data-cal-day],[data-tlw],[data-dhw],[data-dhh],[data-anf],[data-session],[data-stab],[data-outcome],[data-del-user],[data-subtick],[data-subdel],[data-acct-jump],[data-view-jump]");
   if(!t) return;
   const d = t.dataset;
 
@@ -2943,6 +3197,7 @@ document.addEventListener("click", async e=>{
   if(d.tlw){ ui.tlWeeks = Number(d.tlw); render(); return; }
   if(d.dhw){ ui.dhWeeks = Number(d.dhw); render(); return; }
   if(d.dhh){ ui.dhHealth = ui.dhHealth===d.dhh ? null : d.dhh; render(); return; }
+  if(d.anf){ AN.filter = d.anf; render(); return; }
   if(d.session){ ui.sessionId=d.session; ui.sessionTab= state.sessions[d.session].status==="complete"?"summary":"run"; render(); return; }
   if(d.stab){ ui.sessionTab=d.stab; render(); return; }
   if(d.outcome){ await setOutcome(ui.sessionId, d.outcome, d.o); return; }
@@ -2964,6 +3219,11 @@ document.addEventListener("click", async e=>{
     case "new-issue": quickAddModal(); break;
     case "add-devices": addDevicesModal(); break;
     case "pick-import": { const f=$("#xlsxFile"); f.value=""; f.click(); break; }
+    case "an-run": await anRun(); break;
+    case "an-create": await anCreateIssues(); break;
+    case "an-preview": anPreviewModal(d.ref); break;
+    case "an-tick-all": AN.drafts.forEach(x=>{ const p=AN.picks[x.reference]; if(p && !issueByFingerprint(x.reference)) p.include=true; }); anPersist(); render(); break;
+    case "an-untick-all": Object.values(AN.picks).forEach(p=>p.include=false); anPersist(); render(); break;
     case "apply-import": await applyImport(); break;
     case "change-password": passwordModal(); break;
     case "save-password": await savePassword(); break;
@@ -3037,6 +3297,8 @@ document.addEventListener("change", async e=>{
     return;
   }
   if(el.id==="ownerFilter"){ ui.owner = el.value || null; render(); return; }
+  if(d.anpick){ const p=AN.picks[d.anpick]; if(p){ p.include = el.checked; anPersist(); render(); } return; }
+  if(d.anfield && d.anref){ const p=AN.picks[d.anref]; if(p){ p[d.anfield] = el.value; anPersist(); } return; }
   if(el.id==="groupBy"){ ui.group=el.value; render(); }
   if(el.id==="sessNotes") return updateSession(ui.sessionId, {notes:el.value});
   if(el.id==="dwTitle"||el.id==="dwDesc"){
@@ -3122,6 +3384,7 @@ document.addEventListener("keydown", e=>{
   if(e.key==="Enter" && (e.target.id==="gateEmail"||e.target.id==="gatePass")){ e.preventDefault(); submitAuth(); }
 });
 
+anRestore();
 Store.onChange(safeRender);
 window.addEventListener("online",  ()=>setOnline(true));
 window.addEventListener("offline", ()=>setOnline(false));
