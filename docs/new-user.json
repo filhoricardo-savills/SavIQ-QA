@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "What happens when someone joins",
+    "subtitle": "One new team member, from a push on GitHub to her first row of data",
+    "output": "new-user.html",
+    "quality_profile": "showcase",
+    "visual_preset": "signal-flow",
+    "column_fit": "spread",
+    "viewBox": [
+      1060,
+      720
+    ],
+    "views": [
+      {
+        "id": "deploy-once",
+        "label": "The part that happens once",
+        "focus": [
+          "github",
+          "vercel"
+        ],
+        "note": "GitHub appears on the first line and never again. It is how the app gets published, not how it runs."
+      },
+      {
+        "id": "creating-account",
+        "label": "Creating the account",
+        "focus": [
+          "person",
+          "browser",
+          "auth",
+          "postgres"
+        ],
+        "note": "Supabase stores the account. A database trigger quietly creates her profile row at the same moment."
+      },
+      {
+        "id": "first-load",
+        "label": "Signing in and loading data",
+        "focus": [
+          "browser",
+          "auth",
+          "rls",
+          "postgres"
+        ],
+        "note": "The token carries her email. Every row she asks for is checked against it inside Postgres."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "github",
+      "type": "cloud",
+      "label": "GitHub",
+      "sublabel": "the code",
+      "brand": "github"
+    },
+    {
+      "id": "vercel",
+      "type": "cloud",
+      "label": "Vercel",
+      "sublabel": "the page",
+      "brand": "vercel"
+    },
+    {
+      "id": "person",
+      "type": "external",
+      "label": "Marina",
+      "sublabel": "new joiner"
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "The app",
+      "sublabel": "in her browser"
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Auth",
+      "sublabel": "Supabase accounts",
+      "brand": "supabase"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "the data"
+    },
+    {
+      "id": "rls",
+      "type": "security",
+      "label": "Row Security",
+      "sublabel": "the gate"
+    }
+  ],
+  "segments": [
+    {
+      "from": 158,
+      "to": 246,
+      "label": "Published once"
+    },
+    {
+      "from": 256,
+      "to": 400,
+      "label": "Creating the account"
+    },
+    {
+      "from": 410,
+      "to": 500,
+      "label": "Signing in"
+    },
+    {
+      "from": 510,
+      "to": 640,
+      "label": "Loading the workspace"
+    }
+  ],
+  "messages": [
+    {
+      "id": "push",
+      "from": "github",
+      "to": "vercel",
+      "y": 172,
+      "label": "push to main",
+      "variant": "emphasis",
+      "note": "Vercel copies the files and puts them online. This already happened, long before Marina existed. GitHub takes no part in anything below this line."
+    },
+    {
+      "id": "opens",
+      "from": "person",
+      "to": "vercel",
+      "y": 208,
+      "label": "opens the link",
+      "variant": "default"
+    },
+    {
+      "id": "serves",
+      "from": "vercel",
+      "to": "browser",
+      "y": 236,
+      "label": "index.html + config.js",
+      "variant": "return",
+      "note": "Two files, and Vercel is finished. It never sees an issue, a comment or a password."
+    },
+    {
+      "id": "chooses",
+      "from": "person",
+      "to": "browser",
+      "y": 272,
+      "label": "email + a password",
+      "variant": "default"
+    },
+    {
+      "id": "signup",
+      "from": "browser",
+      "to": "auth",
+      "y": 300,
+      "label": "signUp()",
+      "variant": "security",
+      "note": "The browser talks to Supabase directly. There is no server of ours in between."
+    },
+    {
+      "id": "store-account",
+      "from": "auth",
+      "to": "postgres",
+      "y": 328,
+      "label": "store the account",
+      "variant": "security",
+      "note": "A trigger fires here that nobody sees: it creates her profile row in app_users, guesses her name from her address, and makes her an admin only if she is the very first person."
+    },
+    {
+      "id": "confirm-mail",
+      "from": "auth",
+      "to": "person",
+      "y": 358,
+      "label": "confirmation email",
+      "variant": "dashed"
+    },
+    {
+      "id": "confirms",
+      "from": "person",
+      "to": "auth",
+      "y": 386,
+      "label": "confirms the address",
+      "variant": "dashed",
+      "note": "Safe for Savills mail security to pre-click. Confirming is the whole job, so a scanner opening it first changes nothing."
+    },
+    {
+      "id": "signin",
+      "from": "person",
+      "to": "browser",
+      "y": 424,
+      "label": "signs in",
+      "variant": "default"
+    },
+    {
+      "id": "check-password",
+      "from": "browser",
+      "to": "auth",
+      "y": 452,
+      "label": "signInWithPassword()",
+      "variant": "security"
+    },
+    {
+      "id": "token",
+      "from": "auth",
+      "to": "browser",
+      "y": 480,
+      "label": "token carrying her email",
+      "variant": "return",
+      "note": "Every request from here on carries this token. It is what proves she is marina.curto@savills.ie."
+    },
+    {
+      "id": "asks",
+      "from": "browser",
+      "to": "rls",
+      "y": 522,
+      "label": "give me accounts and issues",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gate",
+      "from": "rls",
+      "to": "postgres",
+      "y": 550,
+      "label": "is_team() reads the token",
+      "variant": "security",
+      "note": "Checked inside the database on every single row. Not in the page, so it cannot be bypassed by editing the page or calling the API directly."
+    },
+    {
+      "id": "rows",
+      "from": "postgres",
+      "to": "browser",
+      "y": 578,
+      "label": "her permitted rows",
+      "variant": "return",
+      "note": "A non-Savills address reaches exactly this point and gets nothing back. The app loads, and is empty."
+    },
+    {
+      "id": "live",
+      "from": "postgres",
+      "to": "browser",
+      "y": 612,
+      "label": "live changes from now on",
+      "variant": "dashed",
+      "note": "An issue Kushagra raises appears on Marina's screen a second later, with nobody refreshing."
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "GitHub appears once, at the top",
+      "items": [
+        "It publishes the app. It does not run it.",
+        "Nothing below the first line involves GitHub at all.",
+        "If GitHub vanished, the live app would carry on working.",
+        "You would just have no way to change it, and no history."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Vercel hands over two files and stops",
+      "items": [
+        "index.html is the app; config.js says which database to talk to.",
+        "After that the browser talks to Supabase directly.",
+        "Vercel never sees an issue, a comment, or a password.",
+        "This is why there is no server of ours to maintain."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Supabase does three separate jobs",
+      "items": [
+        "Keeps the account and checks the password.",
+        "Issues a token proving who she is.",
+        "Stores the data, and gates every row against that token.",
+        "Pushes changes live to everyone who has the app open."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "The step you cannot see",
+      "items": [
+        "Storing the account fires a database trigger.",
+        "It creates her profile row, so she appears in Setup.",
+        "Her name is guessed from her email address; she can correct it.",
+        "The first person ever to sign in becomes administrator. Everyone after is a member."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Where a stranger would stop",
+      "items": [
+        "Anyone can open the link and reach the sign-in screen.",
+        "Anyone can create an account with any address.",
+        "They get a real token and the app loads normally.",
+        "Then every query returns nothing, because the gate reads the address in the token. The app works perfectly and is completely empty."
+      ]
+    }
+  ]
+}
